@@ -41,11 +41,20 @@ describe('createRoomInputSchema', () => {
       lng: validRoom.lng,
     })
   })
+
+  it('lowercases the id, as Postgres returns it', () => {
+    const input = { id: validRoom.id.toUpperCase(), lat: 45.5, lng: -12.25 }
+    expect(createRoomInputSchema.parse(input).id).toBe(validRoom.id)
+  })
 })
 
 describe('roomIdSchema', () => {
   it('accepts a room id', () => {
     expect(roomIdSchema.parse(validRoom.id)).toBe(validRoom.id)
+  })
+
+  it('lowercases a room id, as Postgres returns it', () => {
+    expect(roomIdSchema.parse(validRoom.id.toUpperCase())).toBe(validRoom.id)
   })
 
   it.each([

@@ -5,8 +5,9 @@ export const BODY_MAX_LENGTH = 1000
 export const MESSAGES_PAGE_SIZE = 50
 
 export const messageSchema = z.object({
-  id: z.uuid(),
-  roomId: z.uuid(),
+  // Lowercased because Postgres returns UUIDs in lowercase: ids must compare equal as strings.
+  id: z.uuid().toLowerCase(),
+  roomId: z.uuid().toLowerCase(),
   author: z.string().min(1).max(AUTHOR_MAX_LENGTH),
   body: z.string().min(1).max(BODY_MAX_LENGTH),
   createdAt: z.iso.datetime({ precision: 3 }),
@@ -20,7 +21,7 @@ const hasNoNul = (value: string) => !value.includes('\u0000')
 
 /** Body of `POST /api/rooms/:id/messages`. Values are trimmed before the length checks. */
 export const createMessageInputSchema = z.object({
-  id: z.uuid(),
+  id: z.uuid().toLowerCase(),
   author: z
     .string()
     .trim()
@@ -38,7 +39,7 @@ export type CreateMessageInput = z.infer<typeof createMessageInputSchema>
 
 /** Query of `GET /api/rooms/:id/messages`: the newest `limit` messages older than `before`. */
 export const listMessagesQuerySchema = z.object({
-  before: z.uuid().optional(),
+  before: z.uuid().toLowerCase().optional(),
   limit: z.coerce.number().int().min(1).max(100).default(MESSAGES_PAGE_SIZE),
 })
 export type ListMessagesQuery = z.infer<typeof listMessagesQuerySchema>

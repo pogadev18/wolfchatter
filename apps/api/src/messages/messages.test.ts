@@ -100,6 +100,17 @@ describe('POST /api/rooms/:id/messages', () => {
     expect((await listMessages()).json()).toHaveLength(1)
   })
 
+  it('returns the same message when a send to an uppercase room id is retried', async () => {
+    const body = { id: randomUUID(), author: 'ana', body: 'hello' }
+
+    const first = await postMessage(body, roomId.toUpperCase())
+    const retry = await postMessage(body, roomId.toUpperCase())
+
+    expect(retry.statusCode).toBe(201)
+    expect(retry.json()).toEqual(first.json())
+    expect((await listMessages()).json()).toHaveLength(1)
+  })
+
   it('rejects an id that another message already uses', async () => {
     const id = randomUUID()
     await postMessage({ id, author: 'ana', body: 'hello' })
@@ -108,6 +119,18 @@ describe('POST /api/rooms/:id/messages', () => {
 
     expect(response.statusCode).toBe(409)
     expect(apiErrorResponseSchema.parse(response.json()).error.code).toBe('CONFLICT')
+  })
+
+  it('rejects the same id and text sent to another chatroom', async () => {
+    const body = { id: randomUUID(), author: 'ana', body: 'hello' }
+    await postMessage(body)
+    const otherRoomId = await createRoom()
+
+    const response = await postMessage(body, otherRoomId)
+
+    expect(response.statusCode).toBe(409)
+    expect(apiErrorResponseSchema.parse(response.json()).error.code).toBe('CONFLICT')
+    expect((await listMessages('', otherRoomId)).json()).toEqual([])
   })
 
   it('FR-7: pushes the message to clients viewing the room', async () => {

@@ -87,6 +87,21 @@ describe('Socket.IO fan-out', () => {
     expect(await otherReceived).toEqual(postedElsewhere)
   })
 
+  it('FR-7: sends message:created to a client that joined with an uppercase room id', async () => {
+    const client = await connect()
+    const [roomId, otherRoomId] = [randomUUID(), randomUUID()]
+    expect(await client.emitWithAck('room:join', roomId.toUpperCase())).toEqual({ ok: true })
+    await client.emitWithAck('room:join', otherRoomId)
+    const received = new Promise<Message>((resolve) => client.once('message:created', resolve))
+
+    // Messages carry the room id as Postgres returns it: in lowercase.
+    const posted = message(roomId)
+    api.publisher.messageCreated(posted)
+    api.publisher.messageCreated(message(otherRoomId))
+
+    expect(await received).toEqual(posted)
+  })
+
   it("stops sending a room's messages after room:leave", async () => {
     const client = await connect()
     const [leftRoomId, joinedRoomId] = [randomUUID(), randomUUID()]
