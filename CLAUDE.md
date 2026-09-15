@@ -7,7 +7,11 @@ Real-time chat on a map, built for the Wolfpack Digital full-stack test. **Read 
 | Command | What it does |
 |---|---|
 | `pnpm install` | Install dependencies (pnpm 12 required) |
-| `pnpm check` | Everything CI runs: lint, typecheck, tests, work-log check |
+| `pnpm dev` | Start Postgres in Docker, apply migrations and run the API on port 3000 |
+| `pnpm check` | Everything CI runs: lint, typecheck, tests, work-log check. Needs Postgres (`pnpm db:up`) |
+| `pnpm db:up` / `pnpm db:down` | Start / stop the local Postgres (`compose.yaml`, port 5433) |
+| `pnpm db:generate --name <change>` | Generate a migration after editing `apps/api/src/db/schema.ts` |
+| `pnpm db:migrate` | Apply pending migrations to `DATABASE_URL` |
 | `pnpm lint` / `pnpm format` | Biome check / apply formatting and safe fixes |
 | `pnpm typecheck` | `tsc --noEmit` for the root and every package |
 | `pnpm test` | All Vitest projects; one file: `pnpm exec vitest run <path>` |
@@ -18,7 +22,8 @@ Real-time chat on a map, built for the Wolfpack Digital full-stack test. **Read 
 
 - `packages/shared`: zod schemas and types for REST payloads, errors and socket events. Contract changes start here.
 - `packages/worklog`: work-log schema, parser, validator, CLIs and the Stop-hook logic.
-- `apps/api` (M2): Fastify, Socket.IO, Drizzle. `apps/web` (M3): React, Vite, react-leaflet.
+- `apps/api`: Fastify routes and services per domain (`src/rooms/`, `src/messages/`), Socket.IO fan-out (`src/realtime/`), the Drizzle schema (`src/db/`) and generated migrations (`drizzle/`). Test helpers live in `apps/api/test/`.
+- `apps/web` (M3): React, Vite, react-leaflet.
 - `worklog/`: one Markdown file per work-log entry, rendered at `/devlog`.
 - `docs/`: PRD, plans, and later infrastructure and review docs.
 - `.claude/`: settings, hooks and skills for Claude Code.
@@ -37,6 +42,7 @@ Real-time chat on a map, built for the Wolfpack Digital full-stack test. **Read 
 - Write the failing test first, watch it fail for the expected reason, implement, watch it pass.
 - Test behaviour through public interfaces. Prefix a test with its requirement when one applies: `it('FR-5: rejects a blank message', …)`.
 - Never skip, weaken or delete a test to get to green; fix the code or ask.
+- API tests run against real Postgres. `createTestDatabase()` gives each test file its own copy of a migrated template database, and `buildTestApp()` builds the app with test defaults.
 
 ## Work log (required)
 
@@ -64,3 +70,7 @@ Use the `worklog` skill. Every task commits at least one entry together with its
 - TypeScript 7 defaults `types` to `[]`: a package that uses Node globals needs `"types": ["node"]`.
 - Stamen Watercolor tiles come from Stadia Maps. Localhost needs no key; a deployed domain must be registered with Stadia.
 - Leaflet fires `click` twice for a double-click, so map clicks must go through a single-click detector (M3).
+- pnpm 12 refuses to run dependency build scripts until each package is decided in `allowBuilds` (`ERR_PNPM_IGNORED_BUILDS`). `esbuild` is `false`: its binary comes from an optional dependency.
+- Fastify silently ignores a numeric `trustProxy`, and `true` lets clients spoof their address. The API trusts only the proxies listed in `TRUST_PROXY`.
+- Never edit generated migrations in `apps/api/drizzle/`: change `schema.ts` and run `pnpm db:generate`.
+- Docker Desktop on macOS sometimes holds a new Postgres connection for about 5 seconds. The pool waits up to 10 seconds and API tests time out after 15, so a slow test is not necessarily a hang.
