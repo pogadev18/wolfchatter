@@ -39,7 +39,7 @@ When you fix an earlier issue, add `related: [<issue entry id>]` to the new entr
 - **Specific:** quote the command, the error message and the root cause. "`tsc` failed with `Cannot find name 'crypto'` because TypeScript 7 defaults `types` to `[]`" beats "fixed type errors".
 - **Honest:** record mistakes and dead ends, including your own.
 - **Short:** a few sentences per section.
-- **Linked:** `related` for earlier entries, `commits` for earlier commits (the entry's own commit is found from its file history).
+- **Linked:** `related` for earlier entries, `commits` for earlier commits (the entry's own commit is found from its file history). Quote SHAs, as in `commits: ['1234567']`: YAML reads an all-digit SHA as a number, which fails the check.
 
 ## Example
 
@@ -66,5 +66,5 @@ The test caught the limit itself, but it could not catch proxy behaviour, becaus
 
 ## Takeaway
 
-Fastify now runs with `trustProxy: true`, and a test sends `X-Forwarded-For` to prove that separate clients get separate buckets.
+Fastify now trusts only the proxy in front of the API instead of `trustProxy: true`, which trusts every hop and lets any client spoof `X-Forwarded-For`. Tests prove that separate clients get separate buckets and that a spoofed header still hits the limit.
 ```

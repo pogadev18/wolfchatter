@@ -16,9 +16,10 @@ worklog skill: pnpm worklog:new …, fill in the sections, pnpm worklog:check, t
 the entry with the work. If this change genuinely needs no entry, say why and stop.`
 
 const input = hookInputSchema.parse(JSON.parse(readFileSync(0, 'utf8')))
+const projectDir = process.env.CLAUDE_PROJECT_DIR ?? input.cwd
 
 function git(args: string[]): string {
-  return execFileSync('git', args, { cwd: input.cwd, encoding: 'utf8', stdio: 'pipe' })
+  return execFileSync('git', args, { cwd: projectDir, encoding: 'utf8', stdio: 'pipe' })
 }
 
 /** Files changed in commits after the last one that touched worklog/, plus uncommitted changes. */

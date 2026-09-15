@@ -20,5 +20,8 @@ blob-report/
 .DS_Store
 *.log
 
+# Personal Claude Code settings
+.claude/settings.local.json
+
 # Recruitment brief (kept out of the repo; requirements live in docs/PRD.md)
 /Fullstack Developer Test*.pdf
