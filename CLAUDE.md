@@ -73,4 +73,4 @@ Use the `worklog` skill. Every task commits at least one entry together with its
 - pnpm 12 refuses to run dependency build scripts until each package is decided in `allowBuilds` (`ERR_PNPM_IGNORED_BUILDS`). `esbuild` is `false`: its binary comes from an optional dependency.
 - Fastify silently ignores a numeric `trustProxy`, and `true` lets clients spoof their address. The API trusts only the proxies listed in `TRUST_PROXY`.
 - Never edit generated migrations in `apps/api/drizzle/`: change `schema.ts` and run `pnpm db:generate`.
-- Docker Desktop on macOS sometimes holds a new Postgres connection for about 5 seconds. The pool waits up to 10 seconds and API tests time out after 15, so a slow test is not necessarily a hang.
+- Connect to the local Postgres by `127.0.0.1`, not `localhost`. On macOS, resolving `localhost` sometimes took 5 seconds before Node even tried to connect: 4 stalls in 10,500 connects, and none in 10,500 by `127.0.0.1`. The pool still waits up to 10 seconds and API tests time out after 15, so a slow test is not necessarily a hang.
