@@ -11,6 +11,7 @@ describe('parseEnv', () => {
       PORT: 3000,
       LOG_LEVEL: 'info',
       CORS_ORIGINS: ['http://localhost:5173'],
+      TRUST_PROXY: [],
     })
   })
 
@@ -33,6 +34,15 @@ describe('parseEnv', () => {
       expect(() => parseEnv({ DATABASE_URL, CORS_ORIGINS: origin })).toThrow(/CORS_ORIGINS/)
     },
   )
+
+  it('reads the trusted proxies', () => {
+    const env = parseEnv({ DATABASE_URL, TRUST_PROXY: 'uniquelocal, 203.0.113.0/24, ::1' })
+    expect(env.TRUST_PROXY).toEqual(['uniquelocal', '203.0.113.0/24', '::1'])
+  })
+
+  it('rejects a trusted proxy that is not an address or range', () => {
+    expect(() => parseEnv({ DATABASE_URL, TRUST_PROXY: '1' })).toThrow(/TRUST_PROXY must list/)
+  })
 
   it('lists every invalid variable', () => {
     expect(() => parseEnv({ DATABASE_URL: 'mysql://localhost/db', PORT: 'eighty' })).toThrow(

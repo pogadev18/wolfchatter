@@ -5,6 +5,7 @@ import {
 } from '@wolfchatter/shared'
 import type { FastifyPluginAsync } from 'fastify'
 import { z } from 'zod'
+import { RATE_LIMITS } from '../http/limits.ts'
 import type { ZodTypeProvider } from '../http/validation.ts'
 import type { MessagesService } from './service.ts'
 
@@ -29,7 +30,10 @@ export const messageRoutes: FastifyPluginAsync<MessageRoutesOptions> = async (
 
   routes.post(
     '/rooms/:id/messages',
-    { schema: { params: roomParamsSchema, body: createMessageInputSchema } },
+    {
+      schema: { params: roomParamsSchema, body: createMessageInputSchema },
+      config: { rateLimit: RATE_LIMITS.createMessage },
+    },
     async (request, reply) =>
       reply.code(201).send(await messages.create(request.params.id, request.body)),
   )

@@ -1,6 +1,7 @@
 import { z } from 'zod'
 
 const LOG_LEVELS = ['fatal', 'error', 'warn', 'info', 'debug', 'trace', 'silent'] as const
+const PROXY_RANGE_NAMES = ['loopback', 'linklocal', 'uniquelocal'] as const
 
 /** Splits a comma-separated variable, ignoring blanks. */
 const list = (value: string) =>
@@ -31,6 +32,21 @@ export const envSchema = z.object({
           }),
         )
         .min(1, { error: 'CORS_ORIGINS must list at least one origin' }),
+    ),
+  /**
+   * Proxies whose X-Forwarded-For is trusted: IPs, CIDR ranges, or loopback, linklocal and
+   * uniquelocal. Empty trusts none. Never trust every hop: clients could spoof their address.
+   */
+  TRUST_PROXY: z
+    .string()
+    .default('')
+    .transform(list)
+    .pipe(
+      z.array(
+        z.union([z.enum(PROXY_RANGE_NAMES), z.ipv4(), z.ipv6(), z.cidrv4(), z.cidrv6()], {
+          error: 'TRUST_PROXY must list IPs, CIDR ranges, loopback, linklocal or uniquelocal',
+        }),
+      ),
     ),
   /** Set by Render on every deploy. `GET /api/health` reports it so deploys can be verified. */
   RENDER_GIT_COMMIT: z.string().min(1).optional(),

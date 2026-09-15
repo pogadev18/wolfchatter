@@ -62,6 +62,9 @@ export function registerErrorHandlers(app: FastifyInstance): void {
         message: `Request bodies are limited to ${BODY_LIMIT_BYTES / 1024} KB`,
       })
     }
+    if (clientError?.statusCode === 429) {
+      return sendError(reply, 429, { code: 'RATE_LIMITED', message: clientError.message })
+    }
     if (clientError) {
       return sendError(reply, clientError.statusCode, {
         code: 'VALIDATION_FAILED',
