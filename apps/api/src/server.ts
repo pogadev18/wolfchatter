@@ -13,6 +13,7 @@ const database = connectDatabase(env.DATABASE_URL, (error) =>
 const { app } = buildApp({
   db: database.db,
   commit: env.RENDER_GIT_COMMIT ?? null,
+  corsOrigins: env.CORS_ORIGINS,
   logger: { level: env.LOG_LEVEL },
 })
 app.addHook('onClose', () => database.pool.end())

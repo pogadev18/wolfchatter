@@ -3,6 +3,7 @@ import { once } from 'node:events'
 import { fileURLToPath } from 'node:url'
 import { afterEach, beforeAll, describe, expect, it } from 'vitest'
 import { createTestDatabase, type TestDatabase } from '../test/database.ts'
+import { connectClient } from '../test/sockets.ts'
 
 const SERVER = fileURLToPath(new URL('./server.ts', import.meta.url))
 
@@ -48,11 +49,14 @@ describe('server', () => {
   it('serves the API and shuts down gracefully on SIGTERM', async () => {
     const { child, url, logs } = await startServer()
     expect((await fetch(`${url}/api/health`)).status).toBe(200)
+    const client = await connectClient(url)
+    const disconnected = new Promise<string>((resolve) => client.once('disconnect', resolve))
 
     child.kill('SIGTERM')
     const [code] = await once(child, 'exit')
 
     expect(code).toBe(0)
+    expect(await disconnected).toBe('io server disconnect')
     expect(logs.join('\n')).toContain('Server closed')
   })
 })

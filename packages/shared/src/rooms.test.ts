@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { createRoomInputSchema, roomSchema, roomTitle } from './rooms.ts'
+import { createRoomInputSchema, roomIdSchema, roomSchema, roomTitle } from './rooms.ts'
 
 const validRoom = {
   id: '7d9f1c2e-3b4a-4c5d-8e6f-0a1b2c3d4e5f',
@@ -40,6 +40,20 @@ describe('createRoomInputSchema', () => {
       lat: validRoom.lat,
       lng: validRoom.lng,
     })
+  })
+})
+
+describe('roomIdSchema', () => {
+  it('accepts a room id', () => {
+    expect(roomIdSchema.parse(validRoom.id)).toBe(validRoom.id)
+  })
+
+  it.each([
+    ['a channel name', 'lobby'],
+    ['a number', 42],
+    ['nothing', undefined],
+  ])('rejects %s', (_case, value) => {
+    expect(roomIdSchema.safeParse(value).success).toBe(false)
   })
 })
 
