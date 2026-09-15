@@ -20,7 +20,9 @@ let api: Api
 let roomId: string
 
 beforeAll(async () => {
-  database = await createTestDatabase()
+  // The (room_id, created_at, id) index already returns tied timestamps in id order. Without
+  // index scans Postgres sorts the rows itself, so only the query's ORDER BY can order them.
+  database = await createTestDatabase({ enable_indexscan: 'off' })
   return () => database.drop()
 })
 
@@ -146,14 +148,25 @@ describe('POST /api/rooms/:id/messages', () => {
 })
 
 describe('GET /api/rooms/:id/messages', () => {
-  /** Inserts five messages at fixed times, three of them in the same millisecond. */
+  /**
+   * Inserts five messages at fixed times, three of them in the same millisecond. The tied rows
+   * go in neither id order nor its reverse, so a sort that ignores ids cannot order them by luck.
+   */
   async function seedMessages(): Promise<Message[]> {
-    const times = ['10:00:00.000', '10:00:01.000', '10:00:01.000', '10:00:01.000', '10:00:02.000']
+    const tiedIds: [string, string, string] = [randomUUID(), randomUUID(), randomUUID()]
+    const [low, middle, high] = tiedIds.sort()
+    const seeds = [
+      { time: '10:00:00.000', id: randomUUID() },
+      { time: '10:00:01.000', id: middle },
+      { time: '10:00:01.000', id: high },
+      { time: '10:00:01.000', id: low },
+      { time: '10:00:02.000', id: randomUUID() },
+    ]
     const rows = await database.db
       .insert(messages)
       .values(
-        times.map((time, index) => ({
-          id: randomUUID(),
+        seeds.map(({ time, id }, index) => ({
+          id,
           roomId,
           author: 'ana',
           body: `message ${index}`,

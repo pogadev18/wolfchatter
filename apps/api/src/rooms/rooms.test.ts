@@ -1,5 +1,6 @@
 import { randomUUID } from 'node:crypto'
 import { apiErrorResponseSchema, type Room, roomListSchema, roomSchema } from '@wolfchatter/shared'
+import { sql } from 'drizzle-orm'
 import { beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
 import { buildTestApp } from '../../test/app.ts'
 import { createTestDatabase, type TestDatabase } from '../../test/database.ts'
@@ -96,6 +97,9 @@ describe('GET /api/rooms', () => {
   it('FR-6: lists stored rooms in the order they were created', async () => {
     const ids = [randomUUID(), randomUUID(), randomUUID()]
     for (const id of ids) await createRoom({ id, lat: 1, lng: 2 })
+    // Postgres stores an updated row as a new version after the others, so reading the table in
+    // storage order would now return the first room last.
+    await database.db.execute(sql`UPDATE rooms SET lat = 3 WHERE number = 1`)
 
     const response = await api.app.inject({ method: 'GET', url: '/api/rooms' })
 

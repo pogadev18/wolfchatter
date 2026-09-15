@@ -12,11 +12,19 @@ export interface TestDatabase extends DatabaseConnection {
   drop(): Promise<void>
 }
 
-/** A fresh, migrated database of its own, copied from the run's template. */
-export async function createTestDatabase(): Promise<TestDatabase> {
+/**
+ * A fresh, migrated database of its own, copied from the run's template. `settings` become
+ * defaults for every connection to it, such as `{ enable_indexscan: 'off' }`.
+ */
+export async function createTestDatabase(
+  settings: Readonly<Record<string, string>> = {},
+): Promise<TestDatabase> {
   const { serverUrl, template } = inject('postgres')
   const name = `wolfchatter_test_${randomUUID().replaceAll('-', '')}`
   await adminQuery(serverUrl, `CREATE DATABASE ${name} TEMPLATE ${template}`)
+  for (const [setting, value] of Object.entries(settings)) {
+    await adminQuery(serverUrl, `ALTER DATABASE ${name} SET ${setting} = ${value}`)
+  }
 
   const url = databaseUrl(serverUrl, name)
   const connection = connectDatabase(url, (error) => {
