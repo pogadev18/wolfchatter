@@ -5,13 +5,13 @@ agent: implementer · claude-sonnet-5
 phase: setup
 task: M1-T1
 outcome: win
-commits: [5cd93fb]
+commits: ['5cd93fb']
 related: []
 ---
 
 ## What happened
 
-Followed the M1 plan's Task 1 steps in order: scaffolded the root workspace (`package.json`, `pnpm-workspace.yaml`, `.nvmrc`, `tsconfig.base.json`, `tsconfig.json`, `biome.json`, `vitest.config.ts`) and `@wolfchatter/shared` with its first contract piece, `roomChannel(roomId: string): \`room:${string}\``. Commands run: `pnpm install`, `pnpm test` before `realtime.ts` existed (RED), `pnpm check` after implementing it (GREEN), and a deliberate type-check gate experiment.
+Followed the M1 plan's Task 1 steps in order: scaffolded the root workspace (`package.json`, `pnpm-workspace.yaml`, `.nvmrc`, `tsconfig.base.json`, `tsconfig.json`, `biome.json`, `vitest.config.ts`) and `@wolfchatter/shared` with its first contract piece, `roomChannel(roomId: string): \`room:${string}\``. Commands run: `pnpm install`, `pnpm test` before `realtime.ts` existed (RED), `pnpm check` after implementing it (GREEN), and a deliberate type-check gate experiment. This entry was written during Task 2, from Task 1's commit and its implementer's report.
 
 ## What went well / what didn't
 

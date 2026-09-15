@@ -16,4 +16,4 @@ Questioning the scope removed a Render service, a Neon branch, a promotion workf
 
 ## Takeaway
 
-When CI passes on `main`, a GitHub Actions pipeline deploys the API to Render, waits for `/api/health` to report the new commit, then deploys the web app to Netlify. Staging is described in `docs/INFRASTRUCTURE.md`.
+When CI passes on `main`, a GitHub Actions pipeline deploys the API to Render, waits for `/api/health` to report the new commit, then deploys the web app to Netlify. Staging will be described in `docs/INFRASTRUCTURE.md` (M4).
