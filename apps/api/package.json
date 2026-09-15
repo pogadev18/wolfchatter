@@ -1,0 +1,23 @@
+{
+  "name": "@wolfchatter/api",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Wolfchatter REST and Socket.IO API",
+  "type": "module",
+  "scripts": {
+    "db:generate": "drizzle-kit generate",
+    "db:migrate": "node --env-file=.env.example --env-file-if-exists=.env src/db/migrate.ts",
+    "typecheck": "tsc --noEmit -p tsconfig.json"
+  },
+  "dependencies": {
+    "@wolfchatter/shared": "workspace:*",
+    "drizzle-orm": "0.45.2",
+    "pg": "8.23.0",
+    "zod": "4.6.5"
+  },
+  "devDependencies": {
+    "@types/node": "24.13.4",
+    "@types/pg": "8.23.1",
+    "drizzle-kit": "0.31.10"
+  }
+}
