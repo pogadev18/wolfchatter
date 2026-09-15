@@ -1,6 +1,6 @@
 # Wolfchatter — Technical PRD
 
-**Status:** Draft for review · **Date:** 2026-09-15 · **Scope:** Wolfpack Digital test, including the optional real-time part
+**Status:** Approved · **Date:** 2026-09-15 · **Scope:** Wolfpack Digital test, including the optional real-time part
 
 Wolfchatter is a chat on a map: clicking the map drops a pin that opens a chatroom, clicking a pin opens that room, and everyone in it sees new messages instantly. **Done means** every requirement is covered by an automated test, the app runs locally with two commands, and `main` deploys to production through CI.
 
