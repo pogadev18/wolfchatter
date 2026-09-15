@@ -1,1 +1,5 @@
+export * from './errors.ts'
+export * from './health.ts'
+export * from './messages.ts'
 export * from './realtime.ts'
+export * from './rooms.ts'
