@@ -36,6 +36,8 @@ describe('worklogFrontmatterSchema', () => {
     ['a malformed commit', { commits: ['not-a-sha'] }],
     ['a date without a timezone', { date: '2026-09-15T14:32:00' }],
     ['an unknown field', { mood: 'great' }],
+    ['an agent without a role', { agent: 'claude-opus-5' }],
+    ['an unknown agent role', { agent: 'robot · claude-opus-5' }],
   ])('rejects %s', (_case, override) => {
     expect(worklogFrontmatterSchema.safeParse({ ...base, ...override }).success).toBe(false)
   })

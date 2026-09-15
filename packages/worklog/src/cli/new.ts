@@ -3,11 +3,17 @@ import { join } from 'node:path'
 import { parseArgs } from 'node:util'
 import { z } from 'zod'
 import { buildEntry } from '../create.ts'
-import { WORKLOG_OUTCOMES, WORKLOG_PHASES, WORKLOG_SEVERITIES } from '../schema.ts'
+import {
+  WORKLOG_AGENT_ROLES,
+  WORKLOG_OUTCOMES,
+  WORKLOG_PHASES,
+  WORKLOG_SEVERITIES,
+} from '../schema.ts'
 
 const USAGE = `Usage: pnpm worklog:new --title "…" --phase <${WORKLOG_PHASES.join('|')}>
-  --outcome <${WORKLOG_OUTCOMES.join('|')}> [--severity <${WORKLOG_SEVERITIES.join('|')}>]
-  [--task M1-T2] [--agent "implementer · claude-opus-5"] [--dir worklog]`
+  --outcome <${WORKLOG_OUTCOMES.join('|')}> --agent "<role> · <model id>"
+  [--severity <${WORKLOG_SEVERITIES.join('|')}>] [--task M1-T2] [--dir worklog]
+Roles: ${WORKLOG_AGENT_ROLES.join(', ')}. Example: --agent "implementer · claude-sonnet-5"`
 
 const argsSchema = z.object({
   title: z.string(),
@@ -27,7 +33,7 @@ try {
       outcome: { type: 'string' },
       severity: { type: 'string' },
       task: { type: 'string' },
-      agent: { type: 'string', default: 'claude-opus-5' },
+      agent: { type: 'string' },
       dir: { type: 'string', default: 'worklog' },
     },
   })

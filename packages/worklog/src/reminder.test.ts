@@ -11,6 +11,10 @@ describe('needsWorklogReminder', () => {
     expect(needsWorklogReminder(changed)).toBe(false)
   })
 
+  it('does not count other files under worklog/ as an entry', () => {
+    expect(needsWorklogReminder(['packages/shared/src/rooms.ts', 'worklog/README.md'])).toBe(true)
+  })
+
   it('stays quiet when nothing changed or only a plan was ticked off', () => {
     expect(needsWorklogReminder([])).toBe(false)
     expect(needsWorklogReminder(['docs/plans/2026-09-15-m1-foundation.md'])).toBe(false)

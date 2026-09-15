@@ -13,6 +13,13 @@ export interface WorklogReport {
   errors: string[]
 }
 
+/** By `date`, then by `id`, comparing code units so the order never depends on the locale. */
+function compareEntries(a: WorklogEntry, b: WorklogEntry): number {
+  if (a.date !== b.date) return a.date < b.date ? -1 : 1
+  if (a.id === b.id) return 0
+  return a.id < b.id ? -1 : 1
+}
+
 export function validateWorklog(files: readonly WorklogFile[]): WorklogReport {
   const entries: WorklogEntry[] = []
   const errors: string[] = []
@@ -30,6 +37,6 @@ export function validateWorklog(files: readonly WorklogFile[]): WorklogReport {
     }
   }
 
-  entries.sort((a, b) => a.date.localeCompare(b.date) || a.id.localeCompare(b.id))
+  entries.sort(compareEntries)
   return { entries, errors }
 }

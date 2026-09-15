@@ -1,7 +1,7 @@
 import { parse as parseYaml } from 'yaml'
 import { type WorklogEntry, worklogFrontmatterSchema } from './schema.ts'
 
-const FILE_NAME = /^(\d{4}-\d{2}-\d{2}T\d{4})-[a-z0-9]+(?:-[a-z0-9]+)*\.md$/
+export const WORKLOG_FILE_NAME = /^(\d{4}-\d{2}-\d{2}T\d{4})-[a-z0-9]+(?:-[a-z0-9]+)*\.md$/
 const FRONTMATTER = /^---\r?\n([\s\S]*?)\r?\n---\r?\n?([\s\S]*)$/
 const HEADING = /^#{1,6} .*$/gm
 const MIN_BODY_LENGTH = 20
@@ -14,7 +14,7 @@ export function fileStamp(isoDate: string): string {
 }
 
 export function parseWorklogFile(fileName: string, content: string): ParseResult {
-  const name = FILE_NAME.exec(fileName)
+  const name = WORKLOG_FILE_NAME.exec(fileName)
   if (!name) {
     return { ok: false, errors: ['file name must look like 2026-09-15T1432-short-slug.md'] }
   }

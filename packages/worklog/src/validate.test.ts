@@ -30,6 +30,19 @@ describe('validateWorklog', () => {
     ])
   })
 
+  it('orders entries that share a date by id, comparing code units', () => {
+    // A collation that ignores punctuation, such as Thai, would put "rename" before "re-run".
+    const date = '2026-09-15T10:00:00Z'
+    const report = validateWorklog([
+      entryFile('2026-09-15T1000-rename-the-table.md', { date }),
+      entryFile('2026-09-15T1000-re-run-the-migration.md', { date }),
+    ])
+    expect(report.entries.map((entry) => entry.id)).toEqual([
+      '2026-09-15T1000-re-run-the-migration',
+      '2026-09-15T1000-rename-the-table',
+    ])
+  })
+
   it('prefixes errors with the file name', () => {
     expect(validateWorklog([{ name: 'oops.md', content: '' }]).errors).toEqual([
       'oops.md: file name must look like 2026-09-15T1432-short-slug.md',

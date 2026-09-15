@@ -1,12 +1,19 @@
+import { WORKLOG_FILE_NAME } from './parse.ts'
+
+const WORKLOG_DIR = 'worklog/'
+
 /** Changes under these paths never need a work-log entry of their own. */
-const EXEMPT_PREFIXES = ['worklog/', 'docs/plans/']
+const EXEMPT_PREFIXES = [WORKLOG_DIR, 'docs/plans/']
 
 /**
  * True when work changed but no work-log entry did. The Stop hook uses this to
  * ask the agent to record what happened before it finishes.
  */
 export function needsWorklogReminder(changedPaths: readonly string[]): boolean {
-  const addedEntry = changedPaths.some((path) => path.startsWith('worklog/'))
+  const addedEntry = changedPaths.some(
+    (path) =>
+      path.startsWith(WORKLOG_DIR) && WORKLOG_FILE_NAME.test(path.slice(WORKLOG_DIR.length)),
+  )
   const changedWork = changedPaths.some(
     (path) => !EXEMPT_PREFIXES.some((prefix) => path.startsWith(prefix)),
   )

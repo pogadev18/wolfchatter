@@ -11,7 +11,7 @@ Real-time chat on a map, built for the Wolfpack Digital full-stack test. **Read 
 | `pnpm lint` / `pnpm format` | Biome check / apply formatting and safe fixes |
 | `pnpm typecheck` | `tsc --noEmit` for the root and every package |
 | `pnpm test` | All Vitest projects; one file: `pnpm exec vitest run <path>` |
-| `pnpm worklog:new --title "…" --phase <phase> --outcome <outcome>` | Create a work-log entry |
+| `pnpm worklog:new --title "…" --phase <phase> --outcome <outcome> --agent "<role> · <model id>"` | Create a work-log entry |
 | `pnpm worklog:check` | Validate every work-log entry |
 
 ## Repository map
