@@ -1,10 +1,13 @@
 import { randomUUID } from 'node:crypto'
+import { sql } from 'drizzle-orm'
 import { inject } from 'vitest'
 import { connectDatabase, type DatabaseConnection } from '../src/db/client.ts'
 import { adminQuery, databaseUrl } from './postgres.ts'
 
 export interface TestDatabase extends DatabaseConnection {
   url: string
+  /** Deletes every room and message and restarts room numbers at 1. */
+  reset(): Promise<void>
   /** Closes the pool and drops the database. */
   drop(): Promise<void>
 }
@@ -22,6 +25,9 @@ export async function createTestDatabase(): Promise<TestDatabase> {
   return {
     ...connection,
     url,
+    async reset() {
+      await connection.db.execute(sql`TRUNCATE rooms, messages RESTART IDENTITY`)
+    },
     async drop() {
       await connection.pool.end()
       await adminQuery(serverUrl, `DROP DATABASE IF EXISTS ${name} WITH (FORCE)`)

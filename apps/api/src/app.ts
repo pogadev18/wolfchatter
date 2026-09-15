@@ -6,6 +6,8 @@ import { BODY_LIMIT_BYTES } from './http/limits.ts'
 import { zodValidatorCompiler } from './http/validation.ts'
 import type { Publisher } from './realtime/publisher.ts'
 import { createSocketServer, type SocketServer } from './realtime/socket-server.ts'
+import { roomRoutes } from './rooms/routes.ts'
+import { createRoomsService } from './rooms/service.ts'
 
 export interface AppOptions {
   db: Database
@@ -38,5 +40,6 @@ export function buildApp(options: AppOptions): Api {
   })
 
   app.register(healthRoutes, { prefix: '/api', db: options.db, commit: options.commit })
+  app.register(roomRoutes, { prefix: '/api', rooms: createRoomsService(options.db, publisher) })
   return { app, io, publisher }
 }
