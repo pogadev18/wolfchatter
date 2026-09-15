@@ -10,9 +10,6 @@
   "scripts": {
     "typecheck": "tsc --noEmit -p tsconfig.json"
   },
-  "devDependencies": {
-    "@types/node": "24.13.4"
-  },
   "dependencies": {
     "zod": "4.6.5"
   }

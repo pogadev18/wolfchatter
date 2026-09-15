@@ -36,7 +36,12 @@
   },
   "overrides": [
     {
-      "includes": ["packages/shared/src/**", "!**/*.test.ts"],
+      "includes": [
+        "packages/shared/src/**",
+        "packages/worklog/src/**",
+        "!packages/worklog/src/cli/**",
+        "!**/*.test.ts"
+      ],
       "linter": {
         "rules": {
           "correctness": {

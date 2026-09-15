@@ -28,7 +28,7 @@ Real-time chat on a map, built for the Wolfpack Digital full-stack test. **Read 
 - **Node 24 runs TypeScript directly** (type stripping), with no build step. Use only erasable syntax (no `enum`, `namespace` or constructor parameter properties) and import relative files with their `.ts` extension.
 - **Strict types, no `any`.** Validate every external input (HTTP bodies, socket payloads, env, files, hook stdin) with zod at the boundary, and infer types with `z.infer` rather than writing them twice.
 - **Biome owns formatting:** 2 spaces, single quotes, no semicolons, 100 columns. A hook formats every file you edit; `pnpm format` fixes the rest.
-- **`packages/shared` must run in browsers and Node:** no `node:*` imports outside tests (Biome enforces it).
+- **Browser-safe packages:** `packages/shared` and `packages/worklog` (except `src/cli/`) will be bundled into the web app, so no `node:*` imports outside tests (Biome enforces it). `packages/shared` also has no Node types, so Node globals fail `pnpm typecheck` there.
 - **Small, focused files** named in kebab-case after the domain (`rooms.ts`, `messages.ts`), with tests next to them as `*.test.ts`.
 - **Dependencies** are pinned exactly (`pnpm add --save-exact`). Prefer a few lines of code over a new dependency.
 
