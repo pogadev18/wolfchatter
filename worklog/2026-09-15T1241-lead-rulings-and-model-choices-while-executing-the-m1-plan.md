@@ -15,14 +15,14 @@ M1 ran with one subagent per task and a review after each. The lead checked the 
 - **R1:** Task 5 stopped at its commit. The push and pull request waited for the whole-branch review, so the PR shows reviewed code.
 - **R2:** `slugify` strips accents with `/\p{M}/gu`. The plan's regex hid invisible combining characters, probably an artefact of JSON escaping.
 - **R3:** each entry's `agent` names the model that did the work, instead of always `claude-opus-5`.
-- **R4:** the toolchain-spike entry no longer claims that every surprise went into the Gotchas in `CLAUDE.md`.
+- **R4:** as committed, the toolchain-spike entry says that only the surprises later tasks could hit again go into the Gotchas in `CLAUDE.md`. The plan's draft said all of them did, but `biome.json` settles Biome's defaults and the upgrade settles the old pnpm.
 - **R5:** M1 has no env schema, although PRD §2 puts env in `packages/shared`. The M2 and M3 plans decide where env validation lives.
 - **R6:** CI runs on pull requests and on pushes to `main`, the lead's reading of the PRD's "every PR and push".
 - **R7:** the M1-T1 entry, written during Task 2, lists Task 1's commit.
 - **R8:** commit trailers name the model that wrote each commit. Task 1's implementer raised this, and the user confirmed it.
 
 Models:
-- **Sonnet** implemented Tasks 1, 2, 4 and 5. Task 5 moved from Haiku after the lead pointed out that Haiku's prose would be plainer, and the user chose Sonnet.
+- **Sonnet** implemented Tasks 1, 2, 4 and 5. Task 5 was planned for Haiku. The lead pointed out that Haiku's work-log prose might be plainer and offered Sonnet, and the user moved Task 5 to Sonnet while keeping Haiku for Task 3.
 - **Haiku** implemented Task 3.
 - **Sonnet** reviewed every task.
 - **Opus** reviewed the whole branch and made its fixes.
@@ -31,7 +31,7 @@ Models:
 
 All five task reviews passed without Critical or Important findings. A live check proved the format hook: a messy file written with Claude Code's Write tool came back formatted. The Stop hook has only been verified with piped JSON; its live check waits for the next session.
 
-What didn't go well: the task reviews compared the code with the plan, not the plan's own judgment. They approved an overclaiming M1-T3 entry, and code the plan itself got wrong. The whole-branch review caught both (see the related entry).
+What didn't go well: the task reviews compared the code with the plan, not the plan's own judgment. They approved an overclaiming M1-T3 entry, and code the plan itself got wrong. The whole-branch review caught both and asked for fixes before merge, with no Critical, five Important and nine Minor findings (see the related entry).
 
 The lead left five findings for later:
 - the Stop hook reminding on every stop;
