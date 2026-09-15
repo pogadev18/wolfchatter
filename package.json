@@ -9,11 +9,13 @@
     "node": ">=24.11.0"
   },
   "scripts": {
-    "check": "pnpm lint && pnpm typecheck && pnpm test",
+    "check": "pnpm lint && pnpm typecheck && pnpm test && pnpm worklog:check",
     "format": "biome check --write .",
     "lint": "biome check .",
     "test": "vitest run",
-    "typecheck": "tsc --noEmit -p tsconfig.json && pnpm -r typecheck"
+    "typecheck": "tsc --noEmit -p tsconfig.json && pnpm -r typecheck",
+    "worklog:check": "node packages/worklog/src/cli/check.ts",
+    "worklog:new": "node packages/worklog/src/cli/new.ts"
   },
   "devDependencies": {
     "@biomejs/biome": "2.5.13",
