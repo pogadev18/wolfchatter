@@ -37,9 +37,14 @@ describe('database schema', () => {
     await database.db.execute(
       sql`INSERT INTO rooms (id, lat, lng, created_at) VALUES (${id}, 0, 0, '2026-09-15T10:00:00.123456Z')`,
     )
-    const [room] = await database.db.select().from(rooms).where(eq(rooms.id, id))
+    // Read the raw stored text, not a Drizzle/JS `Date`: `Date` is inherently
+    // millisecond-resolution, so a round-trip through it reads back '...123Z' even when the
+    // column keeps extra digits, which would hide a regression that drops `precision: 3`.
+    const stored = await database.db.execute<{ created_at: string }>(
+      sql`SELECT created_at::text AS created_at FROM rooms WHERE id = ${id}`,
+    )
 
-    expect(room?.createdAt.toISOString()).toBe('2026-09-15T10:00:00.123Z')
+    expect(stored.rows[0]?.created_at).toBe('2026-09-15 10:00:00.123+00')
   })
 
   it("deletes a room's messages together with the room", async () => {
