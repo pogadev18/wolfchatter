@@ -14,6 +14,7 @@
     "db:generate": "pnpm --filter @wolfchatter/api db:generate",
     "db:migrate": "pnpm --filter @wolfchatter/api db:migrate",
     "db:up": "docker compose up --detach --wait",
+    "dev": "pnpm db:up && pnpm db:migrate && pnpm --filter @wolfchatter/api dev",
     "format": "biome check --write .",
     "lint": "biome check .",
     "test": "vitest run",
