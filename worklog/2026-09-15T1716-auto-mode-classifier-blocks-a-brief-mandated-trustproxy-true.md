@@ -6,7 +6,7 @@ phase: api
 task: M2-T6
 outcome: learning
 commits: []
-related: []
+related: ['2026-09-15T1716-rate-limits-proxy-allowlist-cors-and-helmet']
 ---
 
 ## What happened
@@ -15,8 +15,8 @@ Task 6's Step 6 asks to temporarily set `app.ts`'s `trustProxy` to `true`, then 
 
 ## What went well / what didn't
 
-The `1` half of the proof went cleanly and matched the brief. The `true` half could not be completed: the classifier reads the pending source diff, not just the command text, and let an identical `vitest run` invocation through for `1` while blocking it for `true` — it's keyed on writing the canonical "trust every proxy" pattern, not on running tests after touching `app.ts` in general. Per the harness's own instructions to not route around a denial's intent, I restored the correct code directly instead of retrying through another tool or invocation.
+The `1` half of the proof went cleanly and matched the brief. The `true` half could not be completed. In these two runs the same `vitest run` command was allowed after the `1` edit and refused after the `true` edit, so the refusal seemed to depend on the pending change rather than the command text; two runs cannot show how the classifier actually decides. Per the harness's own instructions to not route around a denial's intent, I restored the correct code directly instead of retrying through another tool or invocation.
 
 ## Takeaway
 
-A brief step that asks an agent to write a canonical insecure setting (`trustProxy: true`, permissive CORS, disabled auth) into a real file and then run something, even briefly and immediately reverted, should expect auto mode to block the run. The next agent hitting this: don't fight the classifier, restore the brief's code, and report the gap rather than forcing the command through. Worth a note for whoever writes future briefs — such proof steps may need an interactive session or a "reason about the expected output" substitute instead of "run it and observe."
+A brief step that asks an agent to write a canonical insecure setting (`trustProxy: true`, permissive CORS, disabled auth) into a real file and then run something, even briefly and immediately reverted, may have the run refused by auto mode, as the `trustProxy: true` step was here. The next agent hitting this: don't fight the classifier, restore the brief's code, and report the gap rather than forcing the command through. Worth a note for whoever writes future briefs — such proof steps may need an interactive session or a "reason about the expected output" substitute instead of "run it and observe."
