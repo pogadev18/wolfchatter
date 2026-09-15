@@ -11,7 +11,7 @@ related: []
 
 ## What happened
 
-Implemented M2-T4 step by step: `TestDatabase.reset()` (`TRUNCATE rooms, messages RESTART IDENTITY`), the failing `rooms.test.ts`, `CONFLICT` in `packages/shared/src/errors.ts`, then `rooms/service.ts`, `rooms/routes.ts` and the `app.ts` wiring. RED matched the brief exactly: `Tests 7 failed (7)`, four `404` vs `201`, one `404` vs `409`, one `404` vs `200`, and the push test's 15s timeout. GREEN gave `Tests 7 passed (7)`. Removing `.onConflictDoNothing({ target: rooms.id })` reproduced the brief's `3 failed | 4 passed (7)` exactly — `500` instead of `201`/`409`, one `201` plus four `500`s in the race test — restoring it returned to 7 passed. `pnpm check`: `Tests 113 passed (113)`, `✔ 19 work-log entries are valid`.
+Implemented M2-T4 step by step: `TestDatabase.reset()` (`TRUNCATE rooms, messages RESTART IDENTITY`), the failing `rooms.test.ts`, `CONFLICT` in `packages/shared/src/errors.ts`, then `rooms/service.ts`, `rooms/routes.ts` and the `app.ts` wiring. RED gave `Tests 7 failed (7)`: two `404`→`201` (create, retry), one `404`→`400` (reject-coordinates), one `404`→`409` (conflict), one `404`→`200` (GET list), one `toEqual` array failure on the race test (five 404s vs five 201s), and the push test's 15s timeout. GREEN gave `Tests 7 passed (7)`. Removing `.onConflictDoNothing({ target: rooms.id })` reproduced the brief's `3 failed | 4 passed (7)` exactly — `500` instead of `201`/`409`, one `201` plus four `500`s in the race test — restoring it returned to 7 passed. `pnpm check`: `Tests 113 passed (113)`, `✔ 19 work-log entries are valid`.
 
 ## What went well / what didn't
 
