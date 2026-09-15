@@ -22,6 +22,7 @@ describe('roomSchema', () => {
     ['a room number below 1', { number: 0 }],
     ['an id that is not a UUID', { id: 'room-1' }],
     ['a timestamp that is not ISO 8601', { createdAt: '15/09/2026' }],
+    ['a timestamp without milliseconds', { createdAt: '2026-09-15T10:00:00Z' }],
   ])('rejects %s', (_case, override) => {
     expect(roomSchema.safeParse({ ...validRoom, ...override }).success).toBe(false)
   })

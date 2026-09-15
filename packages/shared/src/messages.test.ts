@@ -41,6 +41,18 @@ describe('createMessageInputSchema', () => {
     expect(parse('ana', `${longestBody}b`)).toBe(false)
   })
 
+  it('FR-5: rejects over-long values with a readable message', () => {
+    const firstError = (author: string, body: string) =>
+      createMessageInputSchema.safeParse({ id, author, body }).error?.issues[0]?.message
+
+    expect(firstError('a'.repeat(AUTHOR_MAX_LENGTH + 1), 'hello')).toBe(
+      'User names are limited to 32 characters',
+    )
+    expect(firstError('ana', 'b'.repeat(BODY_MAX_LENGTH + 1))).toBe(
+      'Messages are limited to 1000 characters',
+    )
+  })
+
   it('requires a UUID so retried requests can be deduplicated', () => {
     expect(
       createMessageInputSchema.safeParse({ id: '42', author: 'ana', body: 'hi' }).success,
@@ -49,15 +61,21 @@ describe('createMessageInputSchema', () => {
 })
 
 describe('messageSchema', () => {
+  const message = {
+    id,
+    roomId,
+    author: 'ana',
+    body: 'hello',
+    createdAt: '2026-09-15T10:00:00.000Z',
+  }
+
   it('accepts a message as the API serialises it', () => {
-    const message = {
-      id,
-      roomId,
-      author: 'ana',
-      body: 'hello',
-      createdAt: '2026-09-15T10:00:00.000Z',
-    }
     expect(messageSchema.parse(message)).toEqual(message)
+  })
+
+  it('rejects a timestamp without milliseconds', () => {
+    const result = messageSchema.safeParse({ ...message, createdAt: '2026-09-15T10:00:00Z' })
+    expect(result.success).toBe(false)
   })
 })
 

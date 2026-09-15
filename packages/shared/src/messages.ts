@@ -9,7 +9,7 @@ export const messageSchema = z.object({
   roomId: z.uuid(),
   author: z.string().min(1).max(AUTHOR_MAX_LENGTH),
   body: z.string().min(1).max(BODY_MAX_LENGTH),
-  createdAt: z.iso.datetime(),
+  createdAt: z.iso.datetime({ precision: 3 }),
 })
 export type Message = z.infer<typeof messageSchema>
 
@@ -40,7 +40,10 @@ export type ListMessagesQuery = z.infer<typeof listMessagesQuerySchema>
 
 type Ordered = Pick<Message, 'createdAt' | 'id'>
 
-/** The one message order used everywhere: by `createdAt`, then by `id`. */
+/**
+ * The one message order used everywhere: by `createdAt`, then by `id`. Timestamps always have
+ * millisecond precision (see `messageSchema`), so string order is time order.
+ */
 export function compareMessages(a: Ordered, b: Ordered): number {
   if (a.createdAt !== b.createdAt) return a.createdAt < b.createdAt ? -1 : 1
   if (a.id === b.id) return 0

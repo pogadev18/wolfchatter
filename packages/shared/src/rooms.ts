@@ -5,7 +5,7 @@ export const roomSchema = z.object({
   number: z.int().positive(),
   lat: z.number().min(-90).max(90),
   lng: z.number().min(-180).max(180),
-  createdAt: z.iso.datetime(),
+  createdAt: z.iso.datetime({ precision: 3 }),
 })
 export type Room = z.infer<typeof roomSchema>
 
