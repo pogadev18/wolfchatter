@@ -33,7 +33,7 @@ IDs are referenced by plan tasks, test names and the review report.
 | Frontend | React 19, Vite 8, react-leaflet 5, Tailwind 4, React Router | Leaflet is browser-only and SEO is irrelevant: a static SPA |
 | Backend | **Node.js 24 LTS**, Fastify 5, Socket.IO 4.8 | Built-in validation and logging; rooms and auto-reconnect |
 | Data | PostgreSQL 17, Drizzle ORM + migrations | Relational data with typed, SQL-shaped queries |
-| Contract | zod 4 schemas in `packages/shared` | One source of truth for REST, socket events and env |
+| Contract | zod 4 schemas in `packages/shared` | One source of truth for REST and socket events; each app validates its own env |
 | Quality | Strict TypeScript, Biome, Vitest 5, Playwright | Unit, integration and two-browser E2E tests |
 | Hosting | Netlify, Render, Neon, GitHub Actions | Free tiers, and Render holds WebSockets open |
 
@@ -60,13 +60,14 @@ POST /api/rooms                { id, lat, lng }             → 201 Room
 GET  /api/rooms/:id/messages   ?before=<messageId>&limit=50 → Message[], oldest first
 POST /api/rooms/:id/messages   { id, author, body }         → 201 Message
 
-Errors  { error: { code, message, details? } } with 400 / 404 / 429
-Socket  client → room:join(id), room:leave(id)
+Errors  { error: { code, message, details? } } with 400 / 404 / 409 / 413 / 429
+Socket  client → room:join(id, ack), room:leave(id, ack), acknowledged with
+                 { ok: true } or { ok: false, error }
         server → room:created (everyone), message:created (Socket.IO room "room:<id>")
 ```
 
 1. **Writes go through REST only:** validate → insert → commit → publish. Sockets only fan out.
-2. **Best-effort push, exact state on reconnect:** clients upsert events by id (absorbing their own echo), order by `(created_at, id)`, and refetch after every reconnect.
+2. **Best-effort push, exact state on reconnect:** clients upsert events by id (absorbing their own echo), order by `(created_at, id)`, and after every reconnect re-join their room and wait for the acknowledgement before they refetch.
 3. **Scaling (designed, not built):** `@socket.io/postgres-adapter` shares events across instances via Postgres LISTEN/NOTIFY (no Redis); WebSocket-only transport avoids sticky sessions.
 
 ## 5. Frontend state management

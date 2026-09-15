@@ -53,10 +53,24 @@ describe('createMessageInputSchema', () => {
     )
   })
 
+  it('FR-5: rejects NUL characters, which Postgres cannot store', () => {
+    const nul = String.fromCharCode(0)
+    const firstError = (author: string, body: string) =>
+      createMessageInputSchema.safeParse({ id, author, body }).error?.issues[0]?.message
+
+    expect(firstError(`a${nul}na`, 'hello')).toBe('User names cannot contain NUL characters')
+    expect(firstError('ana', `hel${nul}lo`)).toBe('Messages cannot contain NUL characters')
+  })
+
   it('requires a UUID so retried requests can be deduplicated', () => {
     expect(
       createMessageInputSchema.safeParse({ id: '42', author: 'ana', body: 'hi' }).success,
     ).toBe(false)
+  })
+
+  it('lowercases the id, as Postgres returns it', () => {
+    const input = { id: id.toUpperCase(), author: 'ana', body: 'hi' }
+    expect(createMessageInputSchema.parse(input).id).toBe(id)
   })
 })
 
@@ -76,6 +90,11 @@ describe('messageSchema', () => {
   it('rejects a timestamp without milliseconds', () => {
     const result = messageSchema.safeParse({ ...message, createdAt: '2026-09-15T10:00:00Z' })
     expect(result.success).toBe(false)
+  })
+
+  it('lowercases the ids, as Postgres returns them', () => {
+    const uppercase = { ...message, id: id.toUpperCase(), roomId: roomId.toUpperCase() }
+    expect(messageSchema.parse(uppercase)).toEqual(message)
   })
 })
 
@@ -97,6 +116,10 @@ describe('listMessagesQuerySchema', () => {
 
   it('rejects a cursor that is not a message id', () => {
     expect(listMessagesQuerySchema.safeParse({ before: 'yesterday' }).success).toBe(false)
+  })
+
+  it('lowercases the cursor, as Postgres returns message ids', () => {
+    expect(listMessagesQuerySchema.parse({ before: id.toUpperCase() }).before).toBe(id)
   })
 })
 

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { createRoomInputSchema, roomSchema, roomTitle } from './rooms.ts'
+import { createRoomInputSchema, roomIdSchema, roomSchema, roomTitle } from './rooms.ts'
 
 const validRoom = {
   id: '7d9f1c2e-3b4a-4c5d-8e6f-0a1b2c3d4e5f',
@@ -40,6 +40,29 @@ describe('createRoomInputSchema', () => {
       lat: validRoom.lat,
       lng: validRoom.lng,
     })
+  })
+
+  it('lowercases the id, as Postgres returns it', () => {
+    const input = { id: validRoom.id.toUpperCase(), lat: 45.5, lng: -12.25 }
+    expect(createRoomInputSchema.parse(input).id).toBe(validRoom.id)
+  })
+})
+
+describe('roomIdSchema', () => {
+  it('accepts a room id', () => {
+    expect(roomIdSchema.parse(validRoom.id)).toBe(validRoom.id)
+  })
+
+  it('lowercases a room id, as Postgres returns it', () => {
+    expect(roomIdSchema.parse(validRoom.id.toUpperCase())).toBe(validRoom.id)
+  })
+
+  it.each([
+    ['a channel name', 'lobby'],
+    ['a number', 42],
+    ['nothing', undefined],
+  ])('rejects %s', (_case, value) => {
+    expect(roomIdSchema.safeParse(value).success).toBe(false)
   })
 })
 

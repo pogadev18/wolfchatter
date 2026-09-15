@@ -3,6 +3,7 @@ import { z } from 'zod'
 export const API_ERROR_CODES = [
   'VALIDATION_FAILED',
   'NOT_FOUND',
+  'CONFLICT',
   'PAYLOAD_TOO_LARGE',
   'RATE_LIMITED',
   'INTERNAL',

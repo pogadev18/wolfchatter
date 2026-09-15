@@ -17,6 +17,22 @@ jobs:
     name: Lint, typecheck, test, work log
     runs-on: ubuntu-latest
     timeout-minutes: 15
+    services:
+      # Same image, credentials and host port as compose.yaml, so the tests' default
+      # DATABASE_URL from apps/api/.env.example works unchanged.
+      postgres:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_USER: wolfchatter
+          POSTGRES_PASSWORD: wolfchatter
+          POSTGRES_DB: wolfchatter
+        ports:
+          - 5433:5432
+        options: >-
+          --health-cmd "pg_isready -U wolfchatter -d wolfchatter"
+          --health-interval 2s
+          --health-timeout 5s
+          --health-retries 15
     steps:
       - uses: actions/checkout@v7
 
