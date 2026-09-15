@@ -4,6 +4,8 @@ import { healthRoutes } from './health.ts'
 import { registerErrorHandlers } from './http/errors.ts'
 import { BODY_LIMIT_BYTES } from './http/limits.ts'
 import { zodValidatorCompiler } from './http/validation.ts'
+import { messageRoutes } from './messages/routes.ts'
+import { createMessagesService } from './messages/service.ts'
 import type { Publisher } from './realtime/publisher.ts'
 import { createSocketServer, type SocketServer } from './realtime/socket-server.ts'
 import { roomRoutes } from './rooms/routes.ts'
@@ -41,5 +43,9 @@ export function buildApp(options: AppOptions): Api {
 
   app.register(healthRoutes, { prefix: '/api', db: options.db, commit: options.commit })
   app.register(roomRoutes, { prefix: '/api', rooms: createRoomsService(options.db, publisher) })
+  app.register(messageRoutes, {
+    prefix: '/api',
+    messages: createMessagesService(options.db, publisher),
+  })
   return { app, io, publisher }
 }

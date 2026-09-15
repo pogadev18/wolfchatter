@@ -15,6 +15,9 @@ export type Message = z.infer<typeof messageSchema>
 
 export const messageListSchema = z.array(messageSchema)
 
+/** Postgres text columns cannot store NUL characters, so they are rejected up front. */
+const hasNoNul = (value: string) => !value.includes('\u0000')
+
 /** Body of `POST /api/rooms/:id/messages`. Values are trimmed before the length checks. */
 export const createMessageInputSchema = z.object({
   id: z.uuid(),
@@ -22,12 +25,14 @@ export const createMessageInputSchema = z.object({
     .string()
     .trim()
     .min(1, { error: 'Enter a user name' })
-    .max(AUTHOR_MAX_LENGTH, { error: `User names are limited to ${AUTHOR_MAX_LENGTH} characters` }),
+    .max(AUTHOR_MAX_LENGTH, { error: `User names are limited to ${AUTHOR_MAX_LENGTH} characters` })
+    .refine(hasNoNul, { error: 'User names cannot contain NUL characters' }),
   body: z
     .string()
     .trim()
     .min(1, { error: 'Write a message' })
-    .max(BODY_MAX_LENGTH, { error: `Messages are limited to ${BODY_MAX_LENGTH} characters` }),
+    .max(BODY_MAX_LENGTH, { error: `Messages are limited to ${BODY_MAX_LENGTH} characters` })
+    .refine(hasNoNul, { error: 'Messages cannot contain NUL characters' }),
 })
 export type CreateMessageInput = z.infer<typeof createMessageInputSchema>
 

@@ -53,6 +53,15 @@ describe('createMessageInputSchema', () => {
     )
   })
 
+  it('FR-5: rejects NUL characters, which Postgres cannot store', () => {
+    const nul = String.fromCharCode(0)
+    const firstError = (author: string, body: string) =>
+      createMessageInputSchema.safeParse({ id, author, body }).error?.issues[0]?.message
+
+    expect(firstError(`a${nul}na`, 'hello')).toBe('User names cannot contain NUL characters')
+    expect(firstError('ana', `hel${nul}lo`)).toBe('Messages cannot contain NUL characters')
+  })
+
   it('requires a UUID so retried requests can be deduplicated', () => {
     expect(
       createMessageInputSchema.safeParse({ id: '42', author: 'ana', body: 'hi' }).success,
