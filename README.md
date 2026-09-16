@@ -45,7 +45,7 @@ pnpm --filter @wolfchatter/web exec playwright install chromium
 | Endpoint | Behaviour |
 |---|---|
 | `GET /api/health` | `{ ok, db, commit }`; 503 while the database is unreachable |
-| `GET /api/rooms` | The newest 1000 chatrooms, oldest first |
+| `GET /api/rooms` | At most the newest 1000 chatrooms, oldest first — a link to an older chatroom shows "Chatroom not found" |
 | `POST /api/rooms` | `{ id, lat, lng }` → 201 chatroom, numbered by the server; 10 a minute per client |
 | `GET /api/rooms/:id/messages` | The newest `limit` (default 50) messages before the `before` message id, oldest first |
 | `POST /api/rooms/:id/messages` | `{ id, author, body }` → 201 message; 30 a minute per client |
