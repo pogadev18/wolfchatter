@@ -1,4 +1,5 @@
 import { roomTitle } from '@wolfchatter/shared'
+import { RoomChat } from '../messages/room-chat.tsx'
 import type { PanelView } from './panel-view.ts'
 
 interface ChatPanelProps {
@@ -33,8 +34,15 @@ function PanelContent({ view }: { view: PanelView }) {
     case 'not-found':
       return <p className="text-center text-stone-700">Chatroom not found</p>
     case 'creating':
-      return <h2 className="text-center font-semibold text-stone-500">Creating chatroom…</h2>
+      return <RoomChat key={view.roomId} roomId={view.roomId} title="Creating chatroom…" creating />
     case 'room':
-      return <h2 className="text-center font-semibold text-rose-700">{roomTitle(view.room)}</h2>
+      return (
+        <RoomChat
+          key={view.room.id}
+          roomId={view.room.id}
+          title={roomTitle(view.room)}
+          creating={false}
+        />
+      )
   }
 }

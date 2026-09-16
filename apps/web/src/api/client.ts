@@ -1,7 +1,11 @@
 import {
   type ApiErrorResponse,
   apiErrorResponseSchema,
+  type CreateMessageInput,
   type CreateRoomInput,
+  type Message,
+  messageListSchema,
+  messageSchema,
   type Room,
   roomListSchema,
   roomSchema,
@@ -44,6 +48,9 @@ export function describeFailure(error: unknown): string {
 export interface ApiClient {
   listRooms(): Promise<Room[]>
   createRoom(input: CreateRoomInput): Promise<Room>
+  /** The chatroom's newest page of messages, oldest first. */
+  listMessages(roomId: string): Promise<Message[]>
+  createMessage(roomId: string, input: CreateMessageInput): Promise<Message>
 }
 
 /** Calls the API at `baseUrl` and checks every answer against the shared contract. */
@@ -70,6 +77,9 @@ export function createApiClient(baseUrl: string, fetchFn: typeof fetch = fetch):
   return {
     listRooms: () => request(roomListSchema, '/api/rooms'),
     createRoom: (input) => request(roomSchema, '/api/rooms', input),
+    listMessages: (roomId) => request(messageListSchema, `/api/rooms/${roomId}/messages`),
+    createMessage: (roomId, input) =>
+      request(messageSchema, `/api/rooms/${roomId}/messages`, input),
   }
 }
 

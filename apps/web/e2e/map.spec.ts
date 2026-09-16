@@ -99,3 +99,21 @@ test('shows the panel top-right, and as a bottom sheet below 640 px', async ({ p
     expect(attribution.y + attribution.height).toBeLessThanOrEqual(sheet.y)
   }).toPass({ timeout: 5_000 })
 })
+
+test('keeps the map centred when the chat sheet grows below 640 px', async ({ page, database }) => {
+  await page.setViewportSize({ width: 375, height: 812 })
+  await database.createRoom({ lat: 46.7712, lng: 23.6236 })
+  await page.goto('/')
+  const pin = page.getByRole('button', { name: 'Chatroom 1', exact: true })
+
+  await pin.click()
+  await expect(page.getByLabel('Message', { exact: true })).toBeVisible()
+
+  // The pin marks the centre the map opened on; it moves up with the centre of the smaller map.
+  await expect(async () => {
+    const map = await boxOf(page, '.leaflet-container')
+    const tip = await pin.boundingBox()
+    if (!tip) throw new Error('The pin is not visible')
+    expect(Math.abs(tip.y + 41 - (map.y + map.height / 2))).toBeLessThanOrEqual(2)
+  }).toPass({ timeout: 5_000 })
+})

@@ -1,6 +1,7 @@
 import type { LatLngLiteral, LatLngTuple } from 'leaflet'
 import { MapContainer } from 'react-leaflet'
 import { BaseTiles, WATERCOLOR_TILES } from './base-tiles.tsx'
+import { FitToContainer } from './fit-to-container.tsx'
 import { MapClicks } from './map-clicks.tsx'
 import { type RoomPin, RoomPins } from './room-pins.tsx'
 
@@ -25,6 +26,7 @@ export function MapView({ pins, selectedRoomId, onSelectRoom, onCreateRoom }: Ma
       className="size-full"
     >
       <BaseTiles />
+      <FitToContainer />
       <MapClicks onSingleClick={onCreateRoom} />
       <RoomPins pins={pins} selectedRoomId={selectedRoomId} onSelect={onSelectRoom} />
     </MapContainer>

@@ -35,6 +35,25 @@ describe('createApiClient', () => {
     })
   })
 
+  it('sends a message to its chatroom and returns the stored message', async () => {
+    const input = { id: '0b6c8f7e-1d2a-4b3c-9d4e-5f6a7b8c9d0e', author: 'ana', body: 'hello' }
+    const message = { ...input, roomId: room.id, createdAt: '2026-09-15T10:00:01.000Z' }
+    const fetchFn = vi.fn<typeof fetch>(async () => Response.json(message, { status: 201 }))
+    const api = createApiClient('http://api.test', fetchFn)
+
+    const sent = await api.createMessage(room.id, input)
+
+    expect(sent).toEqual(message)
+    expect(fetchFn).toHaveBeenCalledExactlyOnceWith(
+      `http://api.test/api/rooms/${room.id}/messages`,
+      {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify(input),
+      },
+    )
+  })
+
   it("throws the API's error with its status, code and message", async () => {
     const api = createApiClient('http://api.test', async () =>
       Response.json({ error: conflict }, { status: 409 }),
