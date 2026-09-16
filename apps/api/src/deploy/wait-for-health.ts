@@ -1,4 +1,5 @@
 // Run directly: node apps/api/src/deploy/wait-for-health.ts --url <health url> --commit <sha>
+import { setTimeout as delay } from 'node:timers/promises'
 import { parseArgs } from 'node:util'
 import { healthResponseSchema } from '@wolfchatter/shared'
 import { z } from 'zod'
@@ -6,6 +7,15 @@ import { z } from 'zod'
 // A free-tier Render build plus boot is minutes, not seconds.
 export const DEFAULT_TIMEOUT_MS = 10 * 60_000
 export const DEFAULT_POLL_INTERVAL_MS = 10_000
+
+/**
+ * The longest one attempt may go unanswered before it is abandoned and counted as a failed poll.
+ * Long enough for a single attempt to span a free instance waking from sleep (33 seconds measured
+ * against this API, "about a minute" by Render's own estimate), so the poll that wakes a sleeping
+ * API is not abandoned just before it would have answered. Short enough that a connection which
+ * will never answer costs a tenth of the default deadline rather than all of it.
+ */
+export const MAX_ATTEMPT_MS = 60_000
 
 export interface WaitForHealthOptions {
   url: string
@@ -16,9 +26,10 @@ export interface WaitForHealthOptions {
 
 /** Everything the poll loop reads from outside, injected so no test has to wait on real time. */
 export interface WaitForHealthDependencies {
-  fetch: (url: string) => Promise<Response>
+  fetch: (url: string, init: { signal: AbortSignal }) => Promise<Response>
   now: () => number
-  sleep: (ms: number) => Promise<void>
+  /** Resolves after `ms`; once `signal` aborts, rejects instead and stops the timer. */
+  sleep: (ms: number, signal?: AbortSignal) => Promise<void>
 }
 
 /**
@@ -37,6 +48,13 @@ export interface WaitForHealthDependencies {
  * cannot serve — the correct response is to keep polling, same as a mismatch, not to call it
  * done. If the database outage is transient, polling recovers on its own well inside the
  * timeout; if it isn't, the timeout surfaces that honestly instead of a false success.
+ *
+ * The deadline bounds every step, not just the check between polls. Node's `fetch` waits up to 300
+ * seconds for response headers by default, so a server that accepts the connection and never
+ * answers would otherwise hold a single attempt far past the deadline, and the deploy job would end
+ * in GitHub's generic job timeout instead of the error below, which names both commits. So each
+ * attempt gets only the time left before the deadline (at most `MAX_ATTEMPT_MS`), and the wait
+ * between polls stops at the deadline too.
  */
 export async function waitForHealth(
   options: WaitForHealthOptions,
@@ -50,21 +68,22 @@ export async function waitForHealth(
   // message below needs to tell those two situations apart.
   let lastSeenCommit: string | null | undefined
 
-  while (true) {
-    const seen = await pollOnce(deps.fetch, options.url)
+  while (deps.now() < deadline) {
+    const attemptMs = Math.min(deadline - deps.now(), MAX_ATTEMPT_MS)
+    const seen = await pollWithin(deps, options.url, attemptMs)
     if (seen !== undefined) lastSeenCommit = seen.commit
     if (seen?.ok && seen.commit === options.expectedCommit) return
 
-    if (deps.now() >= deadline) {
-      const description =
-        lastSeenCommit === undefined ? 'no valid response' : `commit ${lastSeenCommit}`
-      throw new Error(
-        `Timed out after ${timeoutMs}ms waiting for ${options.url} to report commit ` +
-          `${options.expectedCommit} (last saw ${description})`,
-      )
-    }
-    await deps.sleep(pollIntervalMs)
+    const remainingMs = deadline - deps.now()
+    if (remainingMs > 0) await deps.sleep(Math.min(pollIntervalMs, remainingMs))
   }
+
+  const description =
+    lastSeenCommit === undefined ? 'no valid response' : `commit ${lastSeenCommit}`
+  throw new Error(
+    `Timed out after ${timeoutMs}ms waiting for ${options.url} to report commit ` +
+      `${options.expectedCommit} (last saw ${description})`,
+  )
 }
 
 /** What one health-check attempt found, once its body has passed schema validation. */
@@ -74,18 +93,48 @@ interface HealthSighting {
 }
 
 /**
- * One health-check attempt. Returns the reported `ok` and `commit`, or `undefined` for anything
- * that is not a schema-valid health response — a network failure, a proxy's HTML error page and a
- * malformed body all collapse to the same "try again" signal, so the caller does not need to tell
- * them apart.
+ * One attempt, abandoned once `attemptMs` passes without an answer, which then counts as a failed
+ * poll like any other. Aborting the request's signal cancels it, a slow body included, rather than
+ * leaving it open behind the poller; racing the attempt against its timer is what guarantees the
+ * poller moves on even if a request somehow ignores that signal.
+ */
+async function pollWithin(
+  deps: WaitForHealthDependencies,
+  url: string,
+  attemptMs: number,
+): Promise<HealthSighting | undefined> {
+  const request = new AbortController()
+  const timer = new AbortController()
+  const expired = deps.sleep(attemptMs, timer.signal).then(
+    () => {
+      request.abort(new Error(`No answer from ${url} within ${attemptMs}ms`))
+      return undefined
+    },
+    // The timer was cancelled because the attempt settled first.
+    () => undefined,
+  )
+  try {
+    return await Promise.race([pollOnce(deps.fetch, url, request.signal), expired])
+  } finally {
+    // Stops the timer, so a finished run does not keep the process alive until it fires.
+    timer.abort()
+  }
+}
+
+/**
+ * One health-check request. Returns the reported `ok` and `commit`, or `undefined` for anything
+ * that is not a schema-valid health response — a network failure, an aborted request, a proxy's
+ * HTML error page and a malformed body all collapse to the same "try again" signal, so the caller
+ * does not need to tell them apart.
  */
 async function pollOnce(
-  fetchImpl: (url: string) => Promise<Response>,
+  fetchImpl: WaitForHealthDependencies['fetch'],
   url: string,
+  signal: AbortSignal,
 ): Promise<HealthSighting | undefined> {
   let response: Response
   try {
-    response = await fetchImpl(url)
+    response = await fetchImpl(url, { signal })
   } catch {
     return undefined
   }
@@ -142,7 +191,7 @@ if (import.meta.main) {
         timeoutMs: args.timeoutMs,
         pollIntervalMs: args.pollIntervalMs,
       },
-      { fetch, now: Date.now, sleep: (ms) => new Promise((resolve) => setTimeout(resolve, ms)) },
+      { fetch, now: Date.now, sleep: (ms, signal) => delay(ms, undefined, { signal }) },
     )
     console.log(`✔ ${args.url} is serving commit ${args.commit}`)
   } catch (error) {
