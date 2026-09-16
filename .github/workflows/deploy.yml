@@ -1,0 +1,129 @@
+name: Deploy
+
+# Runs after CI succeeds on main, or on demand. Render's Auto-Deploy is off and Netlify is not
+# linked to this repository, so this workflow is the only thing that ships either of them —
+# nothing deploys unless this file says so.
+on:
+  workflow_run:
+    workflows: [CI]
+    types: [completed]
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+# Deploys queue instead of overlapping: a second push landing mid-deploy waits for the first
+# one to finish rather than racing it (cancel-in-progress: false — cancelling a deploy partway
+# through, unlike cancelling a CI run, can leave the database migrated but the API or web app
+# still on the old commit).
+concurrency:
+  group: deploy
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    name: Migrate, deploy the API, publish the web app
+    runs-on: ubuntu-latest
+    # wait-for-health.ts alone can legitimately run for its own 10-minute default; the rest of
+    # the job (checkout, install, migrate, build, publish) is minutes, not seconds, on top of
+    # that. This must stay comfortably above wait-for-health's timeout, so a slow deploy fails
+    # with *its* descriptive error naming both commits, not a generic "job timed out".
+    timeout-minutes: 20
+    # A failed or cancelled CI run must never deploy. workflow_dispatch has no CI conclusion to
+    # check at all — a human triggering this manually is its own approval.
+    if: github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success'
+    steps:
+      - name: Resolve the commit to deploy
+        id: resolve-sha
+        # In a workflow_run event, `github.sha` is the default branch's *current tip* —
+        # whatever is on main by the time this job starts — not the commit whose CI run just
+        # passed. If a second commit lands on main while this workflow is still queued,
+        # github.sha would point at it instead, and the health check below would compare
+        # against the wrong SHA: green while the actual deploy is stale, or red for a commit
+        # that never triggered a deploy. head_sha is the commit CI actually ran on.
+        # workflow_dispatch has no workflow_run event at all, so HEAD_SHA is unset and the
+        # fallback is the only option.
+        env:
+          HEAD_SHA: ${{ github.event.workflow_run.head_sha }}
+          DEFAULT_SHA: ${{ github.sha }}
+        run: |
+          SHA="${HEAD_SHA:-$DEFAULT_SHA}"
+          echo "Deploying commit $SHA"
+          echo "sha=$SHA" >> "$GITHUB_OUTPUT"
+
+      - name: Checkout the resolved commit
+        uses: actions/checkout@v7
+        with:
+          ref: ${{ steps.resolve-sha.outputs.sha }}
+          # Full history, not GitHub's default shallow clone: the web build resolves each
+          # work-log entry's commit from `git log` (apps/web/plugins/worklog.ts), and a shallow
+          # clone would silently ship a devlog page with no commit links.
+          fetch-depth: 0
+
+      - uses: pnpm/action-setup@v6
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+
+      - name: Migrate the database
+        # This runs before the Render deploy hook below, against the database the *previous*
+        # commit's API is still serving live traffic from — a free-tier build plus boot takes
+        # minutes, and the old instance keeps answering requests for all of them. Every migration
+        # here must therefore be backward compatible with the code still running: additive
+        # changes (a new nullable column, a new table) are safe; renaming or dropping something
+        # the old code still reads is not, and needs its own expand/contract migration pair
+        # across two deploys instead of one.
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+        run: pnpm db:migrate
+
+      - name: Trigger the Render deploy
+        # The hook's 200 only means Render *accepted* the request — it answers before the build
+        # even starts, so this is not evidence anything shipped. The wait-for-health step after
+        # this one is the only real evidence.
+        env:
+          RENDER_DEPLOY_HOOK_URL: ${{ secrets.RENDER_DEPLOY_HOOK_URL }}
+        run: curl -fsS -X POST "$RENDER_DEPLOY_HOOK_URL"
+
+      - name: Wait for the API to serve this commit
+        env:
+          API_ORIGIN: ${{ vars.API_ORIGIN }}
+          SHA: ${{ steps.resolve-sha.outputs.sha }}
+        run: node apps/api/src/deploy/wait-for-health.ts --url "$API_ORIGIN/api/health" --commit "$SHA"
+
+      - name: Build the web app
+        env:
+          VITE_API_URL: ${{ vars.API_ORIGIN }}
+        run: pnpm --filter @wolfchatter/web build
+
+      - name: Publish the web app to Netlify
+        # apps/web, not the repository root: this is a 4-package pnpm workspace, and run from
+        # the root the Netlify CLI's own workspace detection asks an interactive "which package
+        # is this?" question. There is no TTY to answer it in Actions, so it crashes with
+        # ERR_USE_AFTER_CLOSE instead — observed on a real invocation. apps/web has no
+        # workspace of its own, so the question never comes up, and `dist` below resolves
+        # relative to it.
+        #
+        # netlify-cli ships two bins, `netlify` and `ntl`, neither literally named
+        # `netlify-cli` — left to guess, `pnpm dlx` can't pick one and fails with
+        # ERR_PNPM_DLX_MULTIPLE_BINS. `--package=netlify-cli@<version>` plus naming `netlify`
+        # explicitly resolves that.
+        #
+        # `--allow-build` lists the packages pnpm 12 would otherwise refuse to run install
+        # scripts for (ERR_PNPM_IGNORED_BUILDS) — the same rule this repository's own
+        # pnpm-workspace.yaml `allowBuilds` exists for, except `dlx` runs in its own throwaway
+        # store and never reads that file. None of the three are needed for `deploy --prod
+        # --no-build`: esbuild bundles edge functions, sharp transforms images on the CDN, and
+        # unix-dgram reports statsd metrics.
+        working-directory: apps/web
+        env:
+          NETLIFY_AUTH_TOKEN: ${{ secrets.NETLIFY_AUTH_TOKEN }}
+          NETLIFY_SITE_ID: ${{ vars.NETLIFY_SITE_ID }}
+        run: >-
+          pnpm dlx --allow-build=esbuild --allow-build=sharp --allow-build=unix-dgram
+          --package=netlify-cli@27.7.0 netlify deploy --prod --no-build --dir dist

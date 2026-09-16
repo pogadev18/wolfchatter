@@ -14,7 +14,7 @@ concurrency:
 
 jobs:
   checks:
-    name: Lint, typecheck, test, work log
+    name: Lint, typecheck, test, migrations, work log
     runs-on: ubuntu-latest
     timeout-minutes: 15
     services:
@@ -53,6 +53,22 @@ jobs:
 
       - name: Test
         run: pnpm test
+
+      - name: Check migrations match schema.ts
+        # drizzle.config.ts sets no dbCredentials, so `db:generate` only diffs schema.ts against
+        # the migrations already on disk — no database needed. Editing schema.ts without running
+        # `pnpm db:generate` currently reaches main unnoticed, and the deploy workflow then
+        # migrates a database to a schema the running code doesn't expect.
+        #
+        # A genuine schema change adds a brand-new migration file, which starts out untracked —
+        # and a plain `git diff` ignores untracked files entirely, so it would miss exactly the
+        # case this check exists for. `git add -N` (intent-to-add) stages new files with no
+        # content, which is enough for the `git diff` below to treat them as an addition too,
+        # printing their full contents for whoever has to debug the failure.
+        run: |
+          pnpm db:generate
+          git add -N apps/api/drizzle
+          git diff --exit-code -- apps/api/drizzle
 
       - name: Work log
         run: pnpm worklog:check
