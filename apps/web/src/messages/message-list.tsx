@@ -26,8 +26,17 @@ export function MessageList({ messages, unsent, onRetry }: MessageListProps) {
     return <p className="py-6 text-center text-sm text-stone-500">No messages yet</p>
   }
 
+  /* `tabIndex` puts the scrolling list in the tab order. Without it a keyboard-only user cannot
+     reach the list, and so cannot read the history once it overflows: WCAG 2.1.1, and the axe
+     rule scrollable-region-focusable. Biome's rule is about elements that do not scroll. */
   return (
-    <ol ref={listRef} aria-label="Messages" className="min-h-0 flex-1 overflow-y-auto pr-1">
+    <ol
+      ref={listRef}
+      // biome-ignore lint/a11y/noNoninteractiveTabindex: a scrolling region has to be focusable
+      tabIndex={0}
+      aria-label="Messages"
+      className="min-h-0 flex-1 overflow-y-auto pr-1"
+    >
       {messages.map((message) => (
         <MessageItem key={message.id} author={message.author} body={message.body}>
           <time dateTime={message.createdAt}>{dateTime.format(new Date(message.createdAt))}</time>

@@ -139,6 +139,33 @@ test('FR-5: Retry clears the notice that was standing when it was clicked', asyn
   await expect(panel.getByRole('alert')).toHaveCount(0)
 })
 
+test('FR-5: the message list is in the tab order, so a keyboard can scroll its history', async ({
+  page,
+  database,
+}) => {
+  const room = await database.createRoom(CLUJ)
+  await page.goto(`/?room=${room.id}`)
+  // One message long enough to overflow the panel, so the list really does scroll.
+  await sendMessage(page, 'ana', 'long '.repeat(200))
+  const list = page.getByRole('list', { name: 'Messages' })
+  await expect(list.getByRole('listitem').locator('time')).toBeVisible()
+  await expect
+    .poll(() => list.evaluate((element) => element.scrollHeight > element.clientHeight))
+    .toBe(true)
+
+  // Chromium focuses scroll containers of its own accord, so the assertions below pass either
+  // way; the attribute is what every other browser needs (axe: scrollable-region-focusable).
+  await expect(list).toHaveAttribute('tabindex', '0')
+  await list.focus()
+  await list.evaluate((element) => {
+    element.scrollTop = 0
+  })
+  await page.keyboard.press('End')
+
+  await expect(list).toBeFocused()
+  await expect.poll(() => list.evaluate((element) => element.scrollTop)).toBeGreaterThan(0)
+})
+
 test('FR-5: a message the API rejects is removed with the reason, and never retried', async ({
   page,
   database,
