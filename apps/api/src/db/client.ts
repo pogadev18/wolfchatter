@@ -25,20 +25,25 @@ export const STATEMENT_TIMEOUT_MS = 5_000
  */
 export const NO_STATEMENT_TIMEOUT = 0
 
+export interface ConnectionTimeouts {
+  /**
+   * Defaults to `STATEMENT_TIMEOUT_MS`, chosen for request-serving traffic: far above any query
+   * this API's routes make, far below how long anyone would wait for a response. That reasoning
+   * does not transfer to every caller — a test may shorten it instead of waiting out the real
+   * value, and a migration should raise or disable it (`NO_STATEMENT_TIMEOUT`) instead of
+   * inheriting a bound sized for requests.
+   */
+  statementTimeoutMs?: number
+}
+
 /**
  * Opens a connection pool. `onIdleError` receives errors from idle connections, such as a
  * database restart or a serverless database suspending; without a listener they crash the process.
- *
- * `statementTimeoutMs` defaults to `STATEMENT_TIMEOUT_MS`, chosen for request-serving traffic:
- * far above any query this API's routes make, far below how long anyone would wait for a
- * response. That reasoning does not transfer to every caller — a test may shorten it instead of
- * waiting out the real value, and a migration should raise or disable it (`NO_STATEMENT_TIMEOUT`)
- * instead of inheriting a bound sized for requests.
  */
 export function connectDatabase(
   url: string,
   onIdleError: (error: Error) => void,
-  statementTimeoutMs: number = STATEMENT_TIMEOUT_MS,
+  { statementTimeoutMs = STATEMENT_TIMEOUT_MS }: ConnectionTimeouts = {},
 ): DatabaseConnection {
   // 10 seconds covers a serverless database waking up, and a host named `localhost`, which on
   // macOS sometimes takes 5 seconds to resolve.

@@ -36,7 +36,7 @@ describe('connectDatabase', () => {
       (error) => {
         throw error
       },
-      200,
+      { statementTimeoutMs: 200 },
     )
     onTestFinished(() => pool.end())
 
@@ -51,7 +51,7 @@ describe('connectDatabase', () => {
       (error) => {
         throw error
       },
-      200,
+      { statementTimeoutMs: 200 },
     )
     onTestFinished(() => pool.end())
 
