@@ -19,6 +19,12 @@ export const messageListSchema = z.array(messageSchema)
 /** Postgres text columns cannot store NUL characters, so they are rejected up front. */
 const hasNoNul = (value: string) => !value.includes('\u0000')
 
+/**
+ * An unpaired surrogate is not valid Unicode. Postgres would store it as U+FFFD, so the stored
+ * text would no longer match a retry of the same message.
+ */
+const isWellFormed = (value: string) => value.isWellFormed()
+
 /** Body of `POST /api/rooms/:id/messages`. Values are trimmed before the length checks. */
 export const createMessageInputSchema = z.object({
   id: z.uuid().toLowerCase(),
@@ -27,13 +33,15 @@ export const createMessageInputSchema = z.object({
     .trim()
     .min(1, { error: 'Enter a user name' })
     .max(AUTHOR_MAX_LENGTH, { error: `User names are limited to ${AUTHOR_MAX_LENGTH} characters` })
-    .refine(hasNoNul, { error: 'User names cannot contain NUL characters' }),
+    .refine(hasNoNul, { error: 'User names cannot contain NUL characters' })
+    .refine(isWellFormed, { error: 'User names cannot contain unpaired surrogate characters' }),
   body: z
     .string()
     .trim()
     .min(1, { error: 'Write a message' })
     .max(BODY_MAX_LENGTH, { error: `Messages are limited to ${BODY_MAX_LENGTH} characters` })
-    .refine(hasNoNul, { error: 'Messages cannot contain NUL characters' }),
+    .refine(hasNoNul, { error: 'Messages cannot contain NUL characters' })
+    .refine(isWellFormed, { error: 'Messages cannot contain unpaired surrogate characters' }),
 })
 export type CreateMessageInput = z.infer<typeof createMessageInputSchema>
 
