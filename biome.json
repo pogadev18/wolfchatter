@@ -27,6 +27,11 @@
       "semicolons": "asNeeded"
     }
   },
+  "css": {
+    "parser": {
+      "tailwindDirectives": true
+    }
+  },
   "assist": {
     "enabled": true,
     "actions": {
@@ -38,6 +43,7 @@
   "overrides": [
     {
       "includes": [
+        "apps/web/src/**",
         "packages/shared/src/**",
         "packages/worklog/src/**",
         "!packages/worklog/src/cli/**",

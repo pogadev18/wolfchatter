@@ -56,3 +56,48 @@ jobs:
 
       - name: Work log
         run: pnpm worklog:check
+
+  e2e:
+    name: Build and end-to-end tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    services:
+      # The same Postgres as the checks job; the end-to-end run creates its own database in it.
+      postgres:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_USER: wolfchatter
+          POSTGRES_PASSWORD: wolfchatter
+          POSTGRES_DB: wolfchatter
+        ports:
+          - 5433:5432
+        options: >-
+          --health-cmd "pg_isready -U wolfchatter -d wolfchatter"
+          --health-interval 2s
+          --health-timeout 5s
+          --health-retries 15
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: pnpm/action-setup@v6
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+
+      - name: Install Chromium for Playwright
+        run: pnpm --filter @wolfchatter/web exec playwright install --with-deps chromium
+
+      - name: Build and run the end-to-end tests
+        run: pnpm test:e2e
+
+      - name: Upload the Playwright report
+        if: failure()
+        uses: actions/upload-artifact@v7
+        with:
+          name: playwright-report
+          path: apps/web/playwright-report
+          retention-days: 7
