@@ -1,4 +1,5 @@
 import { roomTitle } from '@wolfchatter/shared'
+import { Link } from 'react-router'
 import { RoomChat } from '../messages/room-chat.tsx'
 import { useConnectionStatusText } from '../realtime/use-realtime.ts'
 import type { PanelView } from './panel-view.ts'
@@ -31,6 +32,13 @@ export function ChatPanel({ view, notice, onNotice }: ChatPanelProps) {
       )}
       <p role="status" className="text-center text-stone-500 text-xs">
         {status}
+      </p>
+      {/* FR-8: a small, unobtrusive way to the devlog. Kept as its own line so it cannot collide
+          with the notice/status logic above (M4-T5 rewrites that in this same file). */}
+      <p className="text-center">
+        <Link to="/devlog" className="text-stone-400 text-xs underline hover:text-stone-600">
+          Devlog
+        </Link>
       </p>
     </aside>
   )

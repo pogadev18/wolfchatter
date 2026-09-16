@@ -3,7 +3,8 @@
   "compilerOptions": {
     "lib": ["es2024", "dom", "dom.iterable"],
     "jsx": "react-jsx",
-    "types": ["vite/client"]
+    "types": ["vite/client"],
+    "paths": { "virtual:worklog": ["./src/virtual-worklog.d.ts"] }
   },
   "include": ["src"],
   "exclude": ["src/**/*.test.ts"]

@@ -236,6 +236,9 @@ importers:
       '@wolfchatter/shared':
         specifier: workspace:*
         version: link:../../packages/shared
+      '@wolfchatter/worklog':
+        specifier: workspace:*
+        version: link:../../packages/worklog
       leaflet:
         specifier: 1.9.4
         version: 1.9.4
@@ -282,9 +285,6 @@ importers:
       '@vitejs/plugin-react':
         specifier: 6.1.1
         version: 6.1.1(vite@8.3.0(@types/node@24.13.4)(esbuild@0.28.2)(jiti@2.7.0)(tsx@4.23.13)(yaml@2.9.1))
-      '@wolfchatter/worklog':
-        specifier: workspace:*
-        version: link:../../packages/worklog
       marked:
         specifier: 18.0.13
         version: 18.0.13

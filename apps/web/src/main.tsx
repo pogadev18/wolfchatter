@@ -1,8 +1,8 @@
 import './index.css'
 import { QueryClientProvider } from '@tanstack/react-query'
-import { StrictMode } from 'react'
+import { lazy, StrictMode, Suspense } from 'react'
 import { createRoot } from 'react-dom/client'
-import { BrowserRouter } from 'react-router'
+import { BrowserRouter, Navigate, Route, Routes } from 'react-router'
 import { createApiClient } from './api/client.ts'
 import { App } from './app.tsx'
 import { parseWebEnv } from './env.ts'
@@ -20,6 +20,12 @@ const services = {
 }
 const queryClient = createQueryClient()
 
+// Lazy: virtual:worklog's rendered HTML only grows, and every visitor of '/' — the map, this
+// app's actual product — would otherwise pay to download it, whether they ever open /devlog or not.
+const DevlogPage = lazy(() =>
+  import('./devlog/devlog-page.tsx').then((module) => ({ default: module.DevlogPage })),
+)
+
 const root = document.getElementById('root')
 if (!root) throw new Error('index.html has no #root element')
 
@@ -28,7 +34,23 @@ createRoot(root).render(
     <ServicesProvider services={services}>
       <QueryClientProvider client={queryClient}>
         <BrowserRouter>
-          <App />
+          {/*
+            useRealtime() lives inside App alone, and createSocket connects only when it is
+            called (socket.ts uses autoConnect: false) — so /devlog, which never renders App,
+            never opens a WebSocket. Verified in apps/web/e2e/devlog.spec.ts.
+          */}
+          <Routes>
+            <Route path="/" element={<App />} />
+            <Route
+              path="/devlog"
+              element={
+                <Suspense fallback={<p className="p-8 text-center text-stone-500">Loading…</p>}>
+                  <DevlogPage />
+                </Suspense>
+              }
+            />
+            <Route path="*" element={<Navigate to="/" replace />} />
+          </Routes>
         </BrowserRouter>
       </QueryClientProvider>
     </ServicesProvider>
