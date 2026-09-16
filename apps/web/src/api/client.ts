@@ -57,25 +57,55 @@ export interface ApiClient {
   createMessage(roomId: string, input: CreateMessageInput): Promise<Message>
 }
 
+export interface ApiClientOptions {
+  fetchFn?: typeof fetch
+  /** How long a request waits for an answer before it gives up. Render's free tier can take
+   * about 30 seconds to wake from sleep, so a shorter deadline would fail a routine cold start. */
+  timeoutMs?: number
+}
+
+/** Every request's default deadline (see `ApiClientOptions.timeoutMs`). */
+const DEFAULT_TIMEOUT_MS = 10_000
+
+/**
+ * An `AbortSignal` that fires on its own after `ms`, built on `setTimeout` rather than
+ * `AbortSignal.timeout` so a test can drive it with fake timers instead of waiting for real time
+ * to pass. `clear()` must run once the request it guards has settled, or the timer leaks.
+ */
+function timeoutSignal(ms: number): { signal: AbortSignal; clear: () => void } {
+  const controller = new AbortController()
+  const timer = setTimeout(() => controller.abort(new Error(`Timed out after ${ms}ms`)), ms)
+  return { signal: controller.signal, clear: () => clearTimeout(timer) }
+}
+
 /** Calls the API at `baseUrl` and checks every answer against the shared contract. */
-export function createApiClient(baseUrl: string, fetchFn: typeof fetch = fetch): ApiClient {
+export function createApiClient(baseUrl: string, options: ApiClientOptions = {}): ApiClient {
+  const { fetchFn = fetch, timeoutMs = DEFAULT_TIMEOUT_MS } = options
+
   async function request<Schema extends z.ZodType>(
     schema: Schema,
     path: string,
     body?: unknown,
   ): Promise<z.output<Schema>> {
-    const init =
-      body === undefined
-        ? undefined
-        : {
-            method: 'POST',
-            headers: { 'content-type': 'application/json' },
-            body: JSON.stringify(body),
-          }
-    const response = await fetchFn(`${baseUrl}${path}`, init)
-    const payload: unknown = await response.json().catch(() => undefined)
-    if (!response.ok) throw new ApiRequestError(response.status, errorFrom(response, payload))
-    return schema.parse(payload)
+    const { signal, clear } = timeoutSignal(timeoutMs)
+    try {
+      const init =
+        body === undefined
+          ? { signal }
+          : {
+              method: 'POST',
+              headers: { 'content-type': 'application/json' },
+              body: JSON.stringify(body),
+              signal,
+            }
+      const response = await fetchFn(`${baseUrl}${path}`, init)
+      const payload: unknown = await response.json().catch(() => undefined)
+      if (!response.ok) throw new ApiRequestError(response.status, errorFrom(response, payload))
+      return schema.parse(payload)
+    } finally {
+      // A request that settles on its own must not leave its timer running behind it.
+      clear()
+    }
   }
 
   return {

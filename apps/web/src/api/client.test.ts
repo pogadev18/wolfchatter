@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import {
   ApiRequestError,
   createApiClient,
@@ -23,7 +23,7 @@ const conflict = {
 describe('createApiClient', () => {
   it('sends a create as JSON and returns the parsed chatroom', async () => {
     const fetchFn = vi.fn<typeof fetch>(async () => Response.json(room, { status: 201 }))
-    const api = createApiClient('http://api.test', fetchFn)
+    const api = createApiClient('http://api.test', { fetchFn })
 
     const created = await api.createRoom({ id: room.id, lat: room.lat, lng: room.lng })
 
@@ -32,6 +32,7 @@ describe('createApiClient', () => {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify({ id: room.id, lat: room.lat, lng: room.lng }),
+      signal: expect.any(AbortSignal),
     })
   })
 
@@ -39,7 +40,7 @@ describe('createApiClient', () => {
     const input = { id: '0b6c8f7e-1d2a-4b3c-9d4e-5f6a7b8c9d0e', author: 'ana', body: 'hello' }
     const message = { ...input, roomId: room.id, createdAt: '2026-09-15T10:00:01.000Z' }
     const fetchFn = vi.fn<typeof fetch>(async () => Response.json(message, { status: 201 }))
-    const api = createApiClient('http://api.test', fetchFn)
+    const api = createApiClient('http://api.test', { fetchFn })
 
     const sent = await api.createMessage(room.id, input)
 
@@ -50,14 +51,15 @@ describe('createApiClient', () => {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
         body: JSON.stringify(input),
+        signal: expect.any(AbortSignal),
       },
     )
   })
 
   it("throws the API's error with its status, code and message", async () => {
-    const api = createApiClient('http://api.test', async () =>
-      Response.json({ error: conflict }, { status: 409 }),
-    )
+    const api = createApiClient('http://api.test', {
+      fetchFn: async () => Response.json({ error: conflict }, { status: 409 }),
+    })
 
     const failure = await api.listRooms().catch((reason: unknown) => reason)
 
@@ -66,10 +68,9 @@ describe('createApiClient', () => {
   })
 
   it('throws an INTERNAL error when an error response is not JSON from the API', async () => {
-    const api = createApiClient(
-      'http://api.test',
-      async () => new Response('<h1>Bad gateway</h1>', { status: 502 }),
-    )
+    const api = createApiClient('http://api.test', {
+      fetchFn: async () => new Response('<h1>Bad gateway</h1>', { status: 502 }),
+    })
 
     await expect(api.listRooms()).rejects.toMatchObject({
       status: 502,
@@ -79,7 +80,9 @@ describe('createApiClient', () => {
   })
 
   it('rejects a response that breaks the shared contract', async () => {
-    const api = createApiClient('http://api.test', async () => Response.json([{ id: 'room-1' }]))
+    const api = createApiClient('http://api.test', {
+      fetchFn: async () => Response.json([{ id: 'room-1' }]),
+    })
 
     await expect(api.listRooms()).rejects.toThrow(/Invalid UUID/)
   })
@@ -114,5 +117,65 @@ describe('failure kinds', () => {
     expect(describeFailure(new TypeError('Failed to fetch'))).toBe(
       'The server could not be reached.',
     )
+  })
+})
+
+describe('a request that never answers', () => {
+  beforeEach(() => {
+    vi.useFakeTimers()
+  })
+
+  afterEach(() => {
+    vi.useRealTimers()
+  })
+
+  /**
+   * A real `fetch` never settles on its own here (the server on the other end of a Render cold
+   * start just never replies), but it does honour the signal it was given: aborting it is the
+   * only reason this promise ever rejects.
+   */
+  function hangingFetchFn() {
+    return vi.fn<typeof fetch>(
+      (_url, init) =>
+        new Promise((_resolve, reject) => {
+          if (!init?.signal) return
+          const { signal } = init
+          signal.addEventListener('abort', () => reject(signal.reason))
+        }),
+    )
+  }
+
+  it('gives up once the timeout elapses, on a request that carries a signal', async () => {
+    const fetchFn = hangingFetchFn()
+    const api = createApiClient('http://api.test', { fetchFn, timeoutMs: 10_000 })
+
+    const failure = api.listRooms().catch((reason: unknown) => reason)
+    vi.advanceTimersByTime(10_000)
+
+    expect(await failure).toBeInstanceOf(Error)
+    expect(fetchFn).toHaveBeenCalledExactlyOnceWith('http://api.test/api/rooms', {
+      signal: expect.any(AbortSignal),
+    })
+  })
+
+  it('classifies a timed-out request as temporary, so it keeps its Retry button', async () => {
+    const fetchFn = hangingFetchFn()
+    const api = createApiClient('http://api.test', { fetchFn, timeoutMs: 10_000 })
+
+    const failure = api.listRooms().catch((reason: unknown) => reason)
+    vi.advanceTimersByTime(10_000)
+    const error = await failure
+
+    expect(isTemporaryFailure(error)).toBe(true)
+    expect(isPermanentFailure(error)).toBe(false)
+  })
+
+  it('clears its timer once a request settles normally, leaving none pending', async () => {
+    const fetchFn = vi.fn<typeof fetch>(async () => Response.json([]))
+    const api = createApiClient('http://api.test', { fetchFn, timeoutMs: 10_000 })
+
+    await api.listRooms()
+
+    expect(vi.getTimerCount()).toBe(0)
   })
 })
