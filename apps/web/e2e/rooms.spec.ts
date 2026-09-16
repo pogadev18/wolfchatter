@@ -201,6 +201,32 @@ test('FR-4: an unknown or malformed chatroom id shows "Chatroom not found"', asy
   await expect(panel.getByText('Chatroom not found')).toBeVisible()
 })
 
+test('FR-4: says so when the chatroom list cannot be loaded, instead of loading for ever', async ({
+  page,
+  database,
+}) => {
+  const room = await database.createRoom(CLUJ)
+  await page.route('**/api/rooms', (route) =>
+    route.request().method() === 'GET'
+      ? route.fulfill({
+          status: 503,
+          json: { error: { code: 'INTERNAL', message: 'The chatrooms are not available' } },
+        })
+      : route.continue(),
+  )
+
+  await page.goto(`/?room=${room.id}`)
+
+  const unavailable = page.getByText('The chatrooms could not be loaded')
+  // Three retries, a second, two and four seconds apart, come first.
+  await expect(unavailable.first()).toBeVisible({ timeout: 15_000 })
+  // The panel says it, and so does the map, which would otherwise just look empty.
+  await expect(unavailable).toHaveCount(2)
+  const panel = page.getByRole('complementary', { name: 'Chat' })
+  await expect(panel.getByText('The chatrooms could not be loaded')).toBeVisible()
+  await expect(panel).not.toContainText('Loading chatroom…')
+})
+
 test('FR-6: chatrooms survive a reload and a new session', async ({ page, browser }) => {
   await page.goto('/')
   const click = await mapPoint(page)

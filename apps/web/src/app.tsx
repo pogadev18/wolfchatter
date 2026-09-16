@@ -5,7 +5,7 @@ import { describeFailure } from './api/client.ts'
 import { wrapLongitude } from './map/longitude.ts'
 import { MapView } from './map/map-view.tsx'
 import type { RoomPin } from './map/room-pins.tsx'
-import { ChatPanel } from './panel/chat-panel.tsx'
+import { ChatPanel, ROOMS_UNAVAILABLE } from './panel/chat-panel.tsx'
 import { panelView } from './panel/panel-view.ts'
 import { useRealtime } from './realtime/use-realtime.ts'
 import { useRoomSelection } from './rooms/use-room-selection.ts'
@@ -52,8 +52,16 @@ export function App() {
           onSelectRoom={handleSelectRoom}
           onCreateRoom={handleCreateRoom}
         />
+        {/* The map alone would look empty rather than broken. Above Leaflet's controls (1000). */}
+        {rooms.isError && (
+          <p className="pointer-events-none absolute inset-x-0 top-4 z-[1100] text-center">
+            <span className="rounded bg-white/90 px-3 py-1 text-red-700 text-sm shadow">
+              {ROOMS_UNAVAILABLE}
+            </span>
+          </p>
+        )}
       </main>
-      <ChatPanel view={panelView(selection, rooms.data, creating)} notice={notice} />
+      <ChatPanel view={panelView(selection, rooms.data, creating, rooms.isError)} notice={notice} />
     </div>
   )
 }

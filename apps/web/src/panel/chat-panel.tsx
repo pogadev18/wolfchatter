@@ -3,6 +3,9 @@ import { RoomChat } from '../messages/room-chat.tsx'
 import { useConnectionStatusText } from '../realtime/use-realtime.ts'
 import type { PanelView } from './panel-view.ts'
 
+/** Said in the panel and over the map, so a failed chatroom list is never silent. */
+export const ROOMS_UNAVAILABLE = 'The chatrooms could not be loaded'
+
 interface ChatPanelProps {
   view: PanelView
   /** Why the last action failed, such as a chatroom that could not be created. */
@@ -37,6 +40,8 @@ function PanelContent({ view }: { view: PanelView }) {
       return <p className="text-center text-stone-700">Click on the map to start a chat</p>
     case 'loading':
       return <p className="text-center text-stone-500">Loading chatroom…</p>
+    case 'unavailable':
+      return <p className="text-center text-red-700">{ROOMS_UNAVAILABLE}</p>
     case 'not-found':
       return <p className="text-center text-stone-700">Chatroom not found</p>
     case 'creating':
