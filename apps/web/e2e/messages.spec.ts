@@ -142,6 +142,38 @@ test('FR-5: a message the API rejects is removed with the reason, and never retr
   expect(sends).toHaveLength(1)
 })
 
+test('FR-5: a validation problem replaces a rejection notice, leaving one alert', async ({
+  page,
+  database,
+}) => {
+  const room = await database.createRoom(CLUJ)
+  await page.route('**/api/rooms/*/messages', (route) =>
+    route.request().method() === 'POST'
+      ? route.fulfill({
+          status: 409,
+          json: {
+            error: {
+              code: 'CONFLICT',
+              message: 'This message id is already used by another message',
+            },
+          },
+        })
+      : route.continue(),
+  )
+  await page.goto(`/?room=${room.id}`)
+  const problem = page.getByRole('complementary', { name: 'Chat' }).getByRole('alert')
+
+  await sendMessage(page, 'ana', 'hello')
+  await expect(problem).toHaveText(
+    'Your message was not sent. This message id is already used by another message.',
+  )
+
+  await sendMessage(page, '', 'still here')
+
+  await expect(problem).toHaveCount(1)
+  await expect(problem).toHaveText('Enter a user name')
+})
+
 test('FR-6: messages survive a reload and a new session', async ({ page, database, browser }) => {
   const room = await database.createRoom(CLUJ)
   await page.goto(`/?room=${room.id}`)

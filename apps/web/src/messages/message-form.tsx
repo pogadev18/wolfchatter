@@ -6,16 +6,17 @@ interface MessageFormProps {
   /** True while the chatroom is still being created: the server has nowhere to store a message yet. */
   disabled: boolean
   onSend(input: CreateMessageInput): void
+  /** A client-side validation problem, reported upward so the panel shows at most one notice. */
+  onProblem(problem: string | undefined): void
 }
 
 /** The mockup's inputs. Enter submits, and the shared contract checks the message before it is sent. */
-export function MessageForm({ disabled, onSend }: MessageFormProps) {
+export function MessageForm({ disabled, onSend, onProblem }: MessageFormProps) {
   const authorId = useId()
   const bodyId = useId()
   const bodyRef = useRef<HTMLInputElement>(null)
   const [author, setAuthor] = useState(() => loadUsername(deviceStorage()))
   const [body, setBody] = useState('')
-  const [problem, setProblem] = useState<string>()
 
   // FR-2, FR-4: opening a chatroom puts the cursor in the message input.
   useEffect(() => {
@@ -27,10 +28,9 @@ export function MessageForm({ disabled, onSend }: MessageFormProps) {
     if (disabled) return
     const parsed = createMessageInputSchema.safeParse({ id: crypto.randomUUID(), author, body })
     if (!parsed.success) {
-      setProblem(parsed.error.issues[0]?.message)
+      onProblem(parsed.error.issues[0]?.message)
       return
     }
-    setProblem(undefined)
     setBody('')
     onSend(parsed.data)
   }
@@ -72,11 +72,6 @@ export function MessageForm({ disabled, onSend }: MessageFormProps) {
           Submit
         </button>
       </div>
-      {problem && (
-        <p role="alert" className="text-red-700 text-sm">
-          {problem}
-        </p>
-      )}
     </form>
   )
 }

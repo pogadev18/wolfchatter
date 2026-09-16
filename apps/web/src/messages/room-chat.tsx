@@ -16,9 +16,11 @@ interface RoomChatProps {
 export function RoomChat({ roomId, title, creating }: RoomChatProps) {
   const messages = useMessages(roomId, { enabled: !creating })
   const outgoing = useOutgoingMessages(roomId)
-  const [rejection, setRejection] = useState<string>()
+  // The panel's one notice: a client-side validation problem or a permanently rejected send.
+  // A new one replaces a stale one, so at most one `role="alert"` is ever live at once.
+  const [notice, setNotice] = useState<string>()
   const { send, retry } = useSendMessage({
-    onRejected: (error) => setRejection(`Your message was not sent. ${describeFailure(error)}`),
+    onRejected: (error) => setNotice(`Your message was not sent. ${describeFailure(error)}`),
   })
   const stored = messages.data ?? []
 
@@ -32,13 +34,14 @@ export function RoomChat({ roomId, title, creating }: RoomChatProps) {
       <MessageForm
         disabled={creating}
         onSend={(input) => {
-          setRejection(undefined)
+          setNotice(undefined)
           send({ roomId, input })
         }}
+        onProblem={setNotice}
       />
-      {rejection && (
+      {notice && (
         <p role="alert" className="text-center text-red-700 text-sm">
-          {rejection}
+          {notice}
         </p>
       )}
     </>
