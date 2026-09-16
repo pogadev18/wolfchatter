@@ -36,7 +36,7 @@ pnpm --filter @wolfchatter/web exec playwright install chromium
 | Area | How it works |
 |---|---|
 | Map | Stamen Watercolor tiles from Stadia Maps, switching to OpenStreetMap if a tile fails. A click counts once no second click follows within 300 ms, so double-clicks only zoom |
-| Chatrooms | A click adds the pin at once and creates the chatroom in the background; a create the API rejects removes the pin and says why, with a Retry. The selected chatroom lives in the URL as `?room=<id>` |
+| Chatrooms | A click adds the pin at once and creates the chatroom in the background; a create that fails removes the pin and says why, with a Retry unless the API rejected it for good (a 409 or a 400 would only fail again). The selected chatroom lives in the URL as `?room=<id>` |
 | Messages | Sent optimistically and retried with the same id, so a retry never duplicates. A failed send stays with a Retry button; a message the API rejects for good is removed with the reason |
 | Real time | One WebSocket connection. After every reconnect the app refetches the chatrooms, re-joins the open chatroom and refetches its messages once the join is acknowledged. That refetch returns the newest 50 messages, so a gap longer than 50 messages is not filled in: paging back through older ones is out of scope. The panel shows the connection status, and "Waking up the server…" when the first connection is slow |
 

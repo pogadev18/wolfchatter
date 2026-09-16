@@ -1,7 +1,7 @@
 import { type CreateRoomInput, type Room, roomTitle } from '@wolfchatter/shared'
 import type { LatLngLiteral } from 'leaflet'
 import { useState } from 'react'
-import { describeFailure } from './api/client.ts'
+import { describeFailure, isPermanentFailure } from './api/client.ts'
 import { wrapLongitude } from './map/longitude.ts'
 import { MapView } from './map/map-view.tsx'
 import type { RoomPin } from './map/room-pins.tsx'
@@ -36,11 +36,15 @@ export function App() {
         roomId: input.id,
         // Retries with the same id and position; the API's create is idempotent on id, so this
         // can never duplicate a chatroom the first, unseen attempt actually managed to store.
-        retry: () => {
-          setNotice(undefined)
-          createRoom.mutate(input)
-          selectRoom(input.id)
-        },
+        // Offered only when trying again can succeed: the same request after a 409 or a 400 gets
+        // the same answer, so a Retry button there would be a promise the app cannot keep.
+        retry: isPermanentFailure(error)
+          ? undefined
+          : () => {
+              setNotice(undefined)
+              createRoom.mutate(input)
+              selectRoom(input.id)
+            },
       })
     },
   })

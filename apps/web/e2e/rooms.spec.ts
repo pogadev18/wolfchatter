@@ -108,7 +108,7 @@ test('FR-2: a click on another copy of the world creates the chatroom where it w
   expect(Math.abs(tip.y - center.y)).toBeLessThanOrEqual(2)
 })
 
-test('FR-2: a create the API rejects removes its pin, explains why and is never retried', async ({
+test('FR-2: a create the API rejects for good removes its pin, explains why and offers no retry', async ({
   page,
 }) => {
   const creates = recordRoomCreates(page)
@@ -131,9 +131,12 @@ test('FR-2: a create the API rejects removes its pin, explains why and is never 
   await page.mouse.click(click.x, click.y)
 
   const panel = page.getByRole('complementary', { name: 'Chat' })
-  await expect(panel.getByRole('alert')).toHaveText(
-    "Couldn't create the chatroom. This chatroom id is already used by another chatroom. Retry",
+  const notice = panel.getByRole('alert')
+  await expect(notice).toHaveText(
+    "Couldn't create the chatroom. This chatroom id is already used by another chatroom.",
   )
+  // The same id and position would get the same 409, so a Retry button would be a broken promise.
+  await expect(notice.getByRole('button', { name: 'Retry' })).toHaveCount(0)
   await expect(panel).toContainText('Click on the map to start a chat')
   await expect(page).toHaveURL(/\/$/)
   await expect(page.locator('.room-pin')).toHaveCount(0)
@@ -146,15 +149,14 @@ test('FR-2: Retry on a failed create tries again with the same id and position',
 }) => {
   const creates = recordRoomCreates(page)
   let fail = true
+  // A 429 can succeed on a later try, unlike a 409, and the query client does not retry it by
+  // itself, so the notice and its Retry button appear straight away.
   await page.route('**/api/rooms', (route) =>
     route.request().method() === 'POST' && fail
       ? route.fulfill({
-          status: 409,
+          status: 429,
           json: {
-            error: {
-              code: 'CONFLICT',
-              message: 'This chatroom id is already used by another chatroom',
-            },
+            error: { code: 'RATE_LIMITED', message: 'Rate limit exceeded, retry in 1 minute' },
           },
         })
       : route.continue(),
@@ -163,7 +165,9 @@ test('FR-2: Retry on a failed create tries again with the same id and position',
   const click = await mapPoint(page)
   await page.mouse.click(click.x, click.y)
   const panel = page.getByRole('complementary', { name: 'Chat' })
-  await expect(panel.getByRole('alert')).toContainText("Couldn't create the chatroom.")
+  await expect(panel.getByRole('alert')).toHaveText(
+    "Couldn't create the chatroom. Rate limit exceeded, retry in 1 minute. Retry",
+  )
   fail = false
 
   await panel.getByRole('alert').getByRole('button', { name: 'Retry' }).click()
@@ -384,7 +388,7 @@ test('FR-2, FR-4: going back to a chatroom clears the notice a failed create lef
   const click = await mapPoint(page, { x: -200, y: 100 })
   await page.mouse.click(click.x, click.y)
   await expect(panel.getByRole('alert')).toHaveText(
-    "Couldn't create the chatroom. This chatroom id is already used by another chatroom. Retry",
+    "Couldn't create the chatroom. This chatroom id is already used by another chatroom.",
   )
   await expect(page).toHaveURL(/\/$/)
 
