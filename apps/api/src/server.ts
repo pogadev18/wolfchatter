@@ -3,6 +3,7 @@
 import { buildApp } from './app.ts'
 import { connectDatabase } from './db/client.ts'
 import { parseEnv } from './env.ts'
+import { rateLimits } from './http/limits.ts'
 
 const SHUTDOWN_TIMEOUT_MS = 10_000
 
@@ -15,6 +16,10 @@ const { app } = buildApp({
   commit: env.RENDER_GIT_COMMIT ?? null,
   corsOrigins: env.CORS_ORIGINS,
   trustedProxies: env.TRUST_PROXY,
+  rateLimits: rateLimits({
+    rooms: env.RATE_LIMIT_ROOMS_PER_MINUTE,
+    messages: env.RATE_LIMIT_MESSAGES_PER_MINUTE,
+  }),
   logger: { level: env.LOG_LEVEL },
 })
 app.addHook('onClose', () => database.pool.end())

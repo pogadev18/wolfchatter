@@ -28,6 +28,10 @@ export default defineConfig({
         PORT: String(API_PORT),
         CORS_ORIGINS: WEB_URL,
         TRUST_PROXY: '',
+        // Every test shares 127.0.0.1 and the whole run fits in one window, so the PRD's 10
+        // creates a minute would 429 a later test. The limits themselves are tested in apps/api.
+        RATE_LIMIT_ROOMS_PER_MINUTE: '1000',
+        RATE_LIMIT_MESSAGES_PER_MINUTE: '1000',
         LOG_LEVEL: 'warn',
       },
       url: `${API_URL}/api/health`,

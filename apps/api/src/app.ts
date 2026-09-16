@@ -2,7 +2,7 @@ import Fastify, { type FastifyInstance, type FastifyServerOptions } from 'fastif
 import type { Database } from './db/client.ts'
 import { healthRoutes } from './health.ts'
 import { registerErrorHandlers } from './http/errors.ts'
-import { BODY_LIMIT_BYTES } from './http/limits.ts'
+import { BODY_LIMIT_BYTES, type RateLimits } from './http/limits.ts'
 import { registerSecurity } from './http/security.ts'
 import { zodValidatorCompiler } from './http/validation.ts'
 import { messageRoutes } from './messages/routes.ts'
@@ -20,6 +20,8 @@ export interface AppOptions {
   corsOrigins: readonly string[]
   /** Proxies trusted to report the client address in X-Forwarded-For; empty trusts none. */
   trustedProxies: readonly string[]
+  /** Per-client write limits; the PRD's values unless RATE_LIMIT_* raises them. */
+  rateLimits: RateLimits
   logger?: FastifyServerOptions['logger']
 }
 
@@ -51,10 +53,15 @@ export function buildApp(options: AppOptions): Api {
   })
 
   app.register(healthRoutes, { prefix: '/api', db: options.db, commit: options.commit })
-  app.register(roomRoutes, { prefix: '/api', rooms: createRoomsService(options.db, publisher) })
+  app.register(roomRoutes, {
+    prefix: '/api',
+    rooms: createRoomsService(options.db, publisher),
+    rateLimit: options.rateLimits.createRoom,
+  })
   app.register(messageRoutes, {
     prefix: '/api',
     messages: createMessagesService(options.db, publisher),
+    rateLimit: options.rateLimits.createMessage,
   })
   return { app, io, publisher }
 }
