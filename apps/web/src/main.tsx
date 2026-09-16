@@ -7,10 +7,17 @@ import { createApiClient } from './api/client.ts'
 import { App } from './app.tsx'
 import { parseWebEnv } from './env.ts'
 import { createQueryClient } from './query-client.ts'
+import { createConnectionStatusStore } from './realtime/connection-status.ts'
+import { createSocket } from './realtime/socket.ts'
 import { ServicesProvider } from './services.tsx'
 
 const env = parseWebEnv(import.meta.env)
-const services = { api: createApiClient(env.VITE_API_URL) }
+const socket = createSocket(env.VITE_API_URL)
+const services = {
+  api: createApiClient(env.VITE_API_URL),
+  socket,
+  connectionStatus: createConnectionStatusStore(socket),
+}
 const queryClient = createQueryClient()
 
 const root = document.getElementById('root')

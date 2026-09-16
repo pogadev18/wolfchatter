@@ -7,6 +7,7 @@ import { MapView } from './map/map-view.tsx'
 import type { RoomPin } from './map/room-pins.tsx'
 import { ChatPanel } from './panel/chat-panel.tsx'
 import { panelView } from './panel/panel-view.ts'
+import { useRealtime } from './realtime/use-realtime.ts'
 import { useRoomSelection } from './rooms/use-room-selection.ts'
 import { useCreateRoom, useRooms, useRoomsBeingCreated } from './rooms/use-rooms.ts'
 
@@ -18,6 +19,8 @@ export function App() {
   const rooms = useRooms()
   const creating = useRoomsBeingCreated()
   const { selection, selectRoom, deselectRoom } = useRoomSelection()
+  const selectedRoomId = selection.kind === 'room' ? selection.roomId : undefined
+  useRealtime(selectedRoomId)
   const [notice, setNotice] = useState<string>()
   const createRoom = useCreateRoom({
     onError: (error, input) => {
@@ -45,7 +48,7 @@ export function App() {
       <main className="relative isolate min-h-0 flex-1 sm:absolute sm:inset-0">
         <MapView
           pins={roomPins(rooms.data ?? [], creating)}
-          selectedRoomId={selection.kind === 'room' ? selection.roomId : undefined}
+          selectedRoomId={selectedRoomId}
           onSelectRoom={handleSelectRoom}
           onCreateRoom={handleCreateRoom}
         />

@@ -9,6 +9,8 @@ export function createQueryClient(): QueryClient {
   return new QueryClient({
     defaultOptions: {
       queries: {
+        // The socket keeps cached data current, and every connection refetches it (useRealtime).
+        staleTime: Number.POSITIVE_INFINITY,
         retry: (failureCount, error) => failureCount < 3 && isTemporaryFailure(error),
       },
       mutations: {

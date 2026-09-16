@@ -1,5 +1,6 @@
 import { roomTitle } from '@wolfchatter/shared'
 import { RoomChat } from '../messages/room-chat.tsx'
+import { useConnectionStatusText } from '../realtime/use-realtime.ts'
 import type { PanelView } from './panel-view.ts'
 
 interface ChatPanelProps {
@@ -10,6 +11,8 @@ interface ChatPanelProps {
 
 /** The chat panel from the mockup: top-right on wide screens, a bottom sheet below 640 px. */
 export function ChatPanel({ view, notice }: ChatPanelProps) {
+  const status = useConnectionStatusText()
+
   return (
     <aside
       aria-label="Chat"
@@ -21,6 +24,9 @@ export function ChatPanel({ view, notice }: ChatPanelProps) {
           {notice}
         </p>
       )}
+      <p role="status" className="text-center text-stone-500 text-xs">
+        {status}
+      </p>
     </aside>
   )
 }
