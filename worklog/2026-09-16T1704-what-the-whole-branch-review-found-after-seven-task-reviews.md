@@ -5,7 +5,7 @@ agent: implementer · claude-opus-5
 phase: review
 outcome: issue
 severity: medium
-commits: ['e370b84', 'f232dfd', '06bb687', '859d650', 'd4efe8e', 'a04d22e', '373546e', '186df0e', '0bf87c8', '3fc18e6', '07fd55f']
+commits: ['e370b84', 'f232dfd', '06bb687', '859d650', 'd4efe8e', 'a04d22e', '373546e', '186df0e', '0bf87c8', '3fc18e6', '07fd55f', '6c8a2f1']
 related: ['2026-09-16T1522-the-deploy-rehearsed-by-hand-and-the-step-it-would-have-fail', '2026-09-16T0633-three-trust-proxy-values-before-the-request-log-gave-the-rig', '2026-09-16T0835-a-shallow-clone-made-every-work-log-entry-point-at-the-same', '2026-09-16T1217-ci-catches-migration-drift-and-main-deploys-itself']
 ---
 
@@ -52,7 +52,9 @@ on its own (`Expected: 0, Received: 1`). Two of my own slips: `pnpm dlx --cache-
 `ERR_PNPM_PACKAGE_MANAGER_ADD_RESOLVE_LATEST` because pnpm 12 read the flag as a package name
 (`XDG_CACHE_HOME` worked), and a comment edit left a line past 100 columns, which Biome does not
 wrap, so I amended that commit before moving on. A first draft of this entry also said every
-finding sat between tasks, which the list above contradicts.
+finding sat between tasks, which the list above contradicts. And the final self-review found that my
+new poll loop read the clock twice back to back, so a millisecond tick between the reads could hand
+an attempt a budget of zero or less; `6c8a2f1` reads it once per value.
 
 Two calls went beyond the brief. A top-level `#` also becomes `h4`, not `h3`, so no body heading
 sits level with its card's title; no entry uses `#` today. And the plan got inline corrections for
