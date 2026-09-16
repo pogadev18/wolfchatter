@@ -72,7 +72,7 @@ Use the `worklog` skill. Every task commits at least one entry together with its
 - pnpm 12 holds back packages published in the last 24 hours and may add `minimumReleaseAgeExclude` entries to `pnpm-workspace.yaml`. Commit them.
 - TypeScript 7 has no programmatic API, so tools that need one (typescript-eslint and similar) don't work. Lint with Biome.
 - TypeScript 7 defaults `types` to `[]`: a package that uses Node globals needs `"types": ["node"]`.
-- Stamen Watercolor tiles come from Stadia Maps. Localhost needs no key; a deployed domain must be registered with Stadia.
+- Stamen Watercolor tiles come from Stadia Maps. Register the deployed domain, but the check that actually bites is different from the one the PRD assumed: measured on the live tile server, *any* `Referer` is served and a request with **no** `Referer` gets a 401. So never set `Referrer-Policy: no-referrer` anywhere — a meta tag, a `netlify.toml` headers block, a hardening pass — or every tile 401s and the map silently drops to the OpenStreetMap fallback.
 - Leaflet fires `click` twice for a double-click, so map clicks go through `createSingleClickDetector` (`apps/web/src/map/single-click.ts`).
 - Leaflet hands a click on a marker to the map when the marker has no `click` handler of its own, which would create a chatroom under an existing pin.
 - Playwright starts `webServer` commands before `globalSetup`, so the end-to-end database is prepared inside the API's command in `apps/web/playwright.config.ts`.
@@ -82,6 +82,6 @@ Use the `worklog` skill. Every task commits at least one entry together with its
 - Playwright's `getByLabel` matches substrings: `getByLabel('Message')` also finds the "Messages" list, so pass `{ exact: true }`.
 - A Playwright drag that releases the mouse mid-move leaves Leaflet panning with inertia. Pause for 100 ms before `mouse.up()` when a test needs the map to stay put.
 - pnpm 12 refuses to run dependency build scripts until each package is decided in `allowBuilds` (`ERR_PNPM_IGNORED_BUILDS`). `esbuild` is `false`: its binary comes from an optional dependency.
-- Fastify silently ignores a numeric `trustProxy`, and `true` lets clients spoof their address. The API trusts only the proxies listed in `TRUST_PROXY`.
+- Fastify silently ignores a numeric `trustProxy`, and `true` lets clients spoof their address. The API trusts only the proxies listed in `TRUST_PROXY`. On Render that list must include **Cloudflare's published ranges** as well as `loopback,uniquelocal`: Render fronts services with Cloudflare, so without them `req.ip` is whichever Cloudflare edge answered and every visitor shares a handful of rate-limit buckets. Fastify logs `remoteAddress: req.ip`, so the request log — not rate-limit headers — is what tells you the resolved value.
 - Never edit generated migrations in `apps/api/drizzle/`: change `schema.ts` and run `pnpm db:generate`.
 - Connect to the local Postgres by `127.0.0.1`, not `localhost`. On macOS, resolving `localhost` sometimes took 5 seconds before Node even tried to connect: 4 stalls in 10,500 connects, and none in 10,500 by `127.0.0.1`. The pool still waits up to 10 seconds and API tests time out after 15, so a slow test is not necessarily a hang.
