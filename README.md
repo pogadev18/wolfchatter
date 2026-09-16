@@ -2,7 +2,7 @@
 
 Real-time chat on a map: click anywhere to drop a pin and open a chatroom, click a pin to join it, and everyone in the room sees new messages instantly. Built for the Wolfpack Digital full-stack test.
 
-> **Status: M2 API.** The REST and Socket.IO API is in place: chatrooms and messages stored in Postgres, validation, rate limits and real-time fan-out. The web app (M3) comes next; see the [roadmap](docs/plans/README.md).
+> **Status: M3 Web app.** The map and chat work end to end: watercolor map, chatrooms and messages stored in Postgres, optimistic sending with retries, and live updates between browsers. The devlog page and deployment (M4) come next; see the [roadmap](docs/plans/README.md).
 
 ## Documents
 
@@ -20,9 +20,22 @@ pnpm install
 pnpm dev
 ```
 
-`pnpm dev` starts Postgres in Docker, applies the migrations and serves the API at http://localhost:3000; http://localhost:3000/api/health should answer `{"ok":true,"db":"up","commit":null}`. Defaults live in [`apps/api/.env.example`](apps/api/.env.example); override them in `apps/api/.env`.
+`pnpm dev` starts Postgres in Docker, applies the migrations, and runs the API at http://localhost:3000 and the web app at http://localhost:5173. Stop both with Ctrl+C; pnpm then reports the web server's exit as a failure, which is harmless. API defaults live in [`apps/api/.env.example`](apps/api/.env.example) and can be overridden in `apps/api/.env`; the web app reads `VITE_API_URL` (see [`apps/web/vite.config.ts`](apps/web/vite.config.ts)).
 
-`pnpm check` runs everything CI runs: Biome, TypeScript, Vitest and the work-log check. The API tests need Postgres, so run `pnpm db:up` first if `pnpm dev` isn't running.
+`pnpm check` runs everything CI runs: Biome, TypeScript, Vitest, the Playwright end-to-end tests and the work-log check. It needs Postgres (`pnpm db:up`, if `pnpm dev` isn't running) and, once per machine, Playwright's Chromium:
+
+```bash
+pnpm --filter @wolfchatter/web exec playwright install chromium
+```
+
+## Web app
+
+| Area | How it works |
+|---|---|
+| Map | Stamen Watercolor tiles from Stadia Maps, switching to OpenStreetMap if a tile fails. A click counts once no second click follows within 300 ms, so double-clicks only zoom |
+| Chatrooms | A click adds the pin at once and creates the chatroom in the background; a create the API rejects removes the pin and says why. The selected chatroom lives in the URL as `?room=<id>` |
+| Messages | Sent optimistically and retried with the same id, so a retry never duplicates. A failed send stays with a Retry button; a message the API rejects for good is removed with the reason |
+| Real time | One WebSocket connection. After every reconnect the app refetches the chatrooms, re-joins the open chatroom and refetches its messages once the join is acknowledged. The panel shows the connection status, and "Waking up the server…" when the first connection is slow |
 
 ## API
 
@@ -40,6 +53,7 @@ Clients generate the ids, so retrying a write returns the stored item instead of
 
 ```
 apps/api           Fastify REST API, Socket.IO fan-out, Drizzle schema and migrations
+apps/web           React web app: map, chat panel, real-time sync, Playwright tests
 packages/shared    API and real-time contract: zod schemas and types
 packages/worklog   work-log schema, parser, CLIs and Stop-hook logic
 worklog/           work-log entries, one Markdown file each
