@@ -2,17 +2,15 @@ import { roomTitle } from '@wolfchatter/shared'
 import { Link } from 'react-router'
 import { RoomChat } from '../messages/room-chat.tsx'
 import { useConnectionStatusText } from '../realtime/use-realtime.ts'
-import type { PanelView } from './panel-view.ts'
-
-/** Said in the panel and over the map, so a failed chatroom list is never silent. */
-export const ROOMS_UNAVAILABLE = 'The chatrooms could not be loaded'
+import type { PanelNotice } from './notice.ts'
+import { type PanelView, ROOMS_UNAVAILABLE } from './panel-view.ts'
 
 interface ChatPanelProps {
   view: PanelView
   /** Why the last action failed, such as a chatroom that could not be created. */
-  notice: string | undefined
+  notice: PanelNotice | undefined
   /** Set by the chat as well, so the whole panel has one notice and one `role="alert"`. */
-  onNotice(notice: string | undefined): void
+  onNotice(notice: PanelNotice | undefined): void
 }
 
 /** The chat panel from the mockup: top-right on wide screens, a bottom sheet below 640 px. */
@@ -27,7 +25,15 @@ export function ChatPanel({ view, notice, onNotice }: ChatPanelProps) {
       <PanelContent view={view} onNotice={onNotice} />
       {notice && (
         <p role="alert" className="text-center text-red-700 text-sm">
-          {notice}
+          {notice.text}
+          {notice.retry && (
+            <>
+              {' '}
+              <button type="button" onClick={notice.retry} className="font-semibold underline">
+                Retry
+              </button>
+            </>
+          )}
         </p>
       )}
       <p role="status" className="text-center text-stone-500 text-xs">
