@@ -3,9 +3,9 @@
 Wolfchatter runs in production: a static web app on Netlify, an API on Render, and Postgres on
 Neon, deployed by a GitHub Actions workflow that runs after CI passes on `main`. This document
 describes what is actually deployed and how it connects, the deploy pipeline and the traps it has
-already hit, and two things that are **designed but not built**: a staging environment and
-multi-instance scaling. Every section says which category it's in; nothing below is running unless
-it says so.
+already hit, three **known gaps** that are documented rather than fixed, and two things that are
+**designed but not built**: a staging environment and multi-instance scaling. Every section says
+which category it's in; nothing below is running unless it says so.
 
 ## What is deployed, and how it connects
 
@@ -63,7 +63,7 @@ Actions build step, not in Netlify.
 
 | Variable | Value kind | Why |
 |---|---|---|
-| `DATABASE_URL` | Neon's **pooled** connection string, with `sslmode=verify-full` | The API's own request-serving queries; pooled because the API opens many short-lived connections rather than one long-lived session |
+| `DATABASE_URL` | Neon's **pooled** connection string, with `sslmode=verify-full` | The API's own request-serving queries; pooled because the API opens many short-lived connections rather than one long-lived session. That the value on Render really is the pooled string has not been re-checked since setup; see "The statement timeout may not be in effect in production" under Known gaps |
 | `CORS_ORIGINS` | `https://wolfchatter.netlify.app` | The only browser origin allowed to call the API or open a socket |
 | `TRUST_PROXY` | `loopback,uniquelocal` plus Cloudflare's published ranges (below) | Which hops' `X-Forwarded-For` are trusted for the client's real address |
 | `LOG_LEVEL` | `info` | Pino's log verbosity |
@@ -184,9 +184,12 @@ Its steps, in order, and why each is where it is:
 7. **Wait for `/api/health` to report the new commit** — the only real evidence a deploy
    happened. It requires both `ok: true` and the matching commit; a `503` or a stale commit both
    keep it polling, up to a 10-minute timeout that fails naming both the expected commit and the
-   last one it saw. (The job's own 20-minute timeout sits above that on purpose, so a hang
-   anywhere earlier — checkout, install, the migration itself — still produces a specific timeout
-   instead of a generic one.)
+   last one it saw. Each attempt is abandoned after 60 seconds, or sooner if less of the timeout is
+   left, so a connection that never answers cannot hold the wait past it. The job's own 20-minute
+   timeout sits above that on purpose, so a slow deploy fails with this step's descriptive error
+   rather than GitHub's generic "job timed out". No other step has a timeout of its own: a hang in
+   checkout, install, the build, the CLI warm-up or the migration still ends in that generic job
+   timeout.
 8. **Publish to Netlify** — last, because by then the API it will talk to is confirmed live. The
    rehearsal below found that "last" still wasn't safe enough on its own.
 
@@ -202,9 +205,24 @@ Its steps, in order, and why each is where it is:
   decision D8 identified for the automatic trigger, and D9 wrongly assumed the manual trigger
   escaped (D9 is struck through in `docs/plans/2026-09-16-m4-golive.md` rather than rewritten).
   There is no way to trigger `deploy.yml` from a feature branch before merging. It was rehearsed
-  instead by running each step's real command by hand, in the workflow's order, against the real
-  providers, with Render temporarily pointed at the branch
-  (`worklog/2026-09-16T1522-the-deploy-rehearsed-by-hand-and-the-step-it-would-have-fail.md`).
+  instead by hand, against the real providers, with Render temporarily pointed at the branch
+  (`worklog/2026-09-16T1522-the-deploy-rehearsed-by-hand-and-the-step-it-would-have-fail.md`) —
+  but not every step. The health poll, the build and the publish ran their real commands in the
+  workflow's order; the API was deployed from Render's dashboard, not through the hook; and the
+  **migrate step did not run at all**. `pnpm db:migrate` last ran against Neon at setup, from a
+  laptop, with the direct string, before the TLS rule in `apps/api/src/env.ts` existed. The
+  rehearsal's cold-start check was skipped too: "Waking up the server…" is covered by an
+  end-to-end test that delays the first connection (`apps/web/e2e/realtime.spec.ts`), but has not
+  been watched on a genuinely slept instance. So the first automatic deploy is the first run of:
+  - the workflow's own plumbing: the `workflow_run` trigger and its guard, the SHA resolution,
+    and the checkout;
+  - the `DATABASE_URL` secret, and so its first meeting with the TLS rule;
+  - the `RENDER_DEPLOY_HOOK_URL` secret, which the rehearsal did not call;
+  - probably the `NETLIFY_AUTH_TOKEN` secret, since the rehearsal published from a machine whose
+    Netlify CLI was already logged in;
+  - `pnpm dlx` and its `--allow-build` list on Linux, which have only run on macOS;
+  - the CLI warm-up step and the build-before-migrate order, and the
+    `$GITHUB_WORKSPACE/apps/web/dist` spelling of `--dir` (below), all added after the rehearsal.
 - **A `200` from the deploy hook proves nothing.** Render answers the hook before the build even
   starts. The health poll afterward is the only evidence, and it requires both `ok: true` and the
   matching commit — a well-formed `503` reporting the right commit still means the API can't
@@ -216,9 +234,11 @@ Its steps, in order, and why each is where it is:
   commit after the branch was switched.
 - **The Netlify CLI resolves `--dir` against the repository root, not the working directory.** Run
   from `apps/web` exactly as the workflow specifies, `netlify deploy --dir dist` failed with
-  `Deploy path: <repository root>/dist`. The same command with an absolute
-  `--dir "$GITHUB_WORKSPACE/apps/web/dist"` published in 13 seconds. This was the one defect that
-  survived an implementer, a task review and a scoped re-review, because every earlier check
+  `Deploy path: <repository root>/dist`. The same command with an absolute `--dir "$PWD/dist"`,
+  still run from `apps/web`, published in 13 seconds. The workflow spells that same directory
+  `$GITHUB_WORKSPACE/apps/web/dist`, which does not depend on the working directory at all; that
+  spelling has not run yet, and first runs in the first automatic deploy. This was the one defect
+  that survived an implementer, a task review and a scoped re-review, because every earlier check
   confirmed the pinned CLI with `--version` — a flag `--dir` never touches (`f43330a`;
   `worklog/2026-09-16T1518-a-command-verified-with-version-was-not-the-command-that-run.md`).
   `working-directory: apps/web` still matters for a separate reason: run from the repository root,
@@ -244,6 +264,13 @@ requests the whole time. Every migration must therefore be backward compatible w
 running: additive changes (a new nullable column, a new table) are safe; a rename or a drop that
 the old code still reads is not, and needs an expand/contract pair across two deploys instead of
 one.
+
+A migration also must not stall that live traffic. Postgres queues every later request for a
+conflicting lock behind a statement that is waiting for one, so a migration blocked on a lock
+would hold up even plain reads from the running API. The migration connection therefore has no
+statement timeout, since a migration may legitimately run for minutes, but a 2-second lock timeout:
+a migration that cannot get its lock fails with `55P03` and applies nothing, before the API is
+deployed (`MIGRATION_LOCK_TIMEOUT_MS` in `apps/api/src/db/migrations.ts` says why 2 seconds).
 
 **Worked example — renaming `rooms.lat` to `rooms.latitude`:**
 
@@ -271,6 +298,81 @@ that exist on paper, not ones that have been run for real.
   which can roll a branch back to any point inside the project's history window (6 hours on
   Neon's free plan, longer on paid plans). That backstop is the reason migrations stay
   forward-only and additive: a real rollback here means restoring data, not reversing a schema.
+
+## Known gaps — documented, not fixed
+
+Three weaknesses the final M4 review found and M4 deliberately leaves in place, each for M5. None
+of them has been observed in production.
+
+### The deploy hook builds `main`'s tip, not the commit that was migrated
+
+**The gap.** `deploy.yml` calls Render's deploy hook without naming a commit, so Render builds
+whatever is at the tip of `main` when its build starts — not necessarily the commit whose
+migrations the step before just applied.
+
+**What triggers it.** Two merges to `main` within a few minutes, so the second lands before
+Render starts the build the first one asked for.
+
+**What happens.** Deploy A migrates for A and calls the hook; Render builds B. A's health wait
+never sees A's commit and fails after ten minutes, without publishing A's web app. Meanwhile B's
+API is live without B's migrations until deploy B, queued behind A, gets to its own migrate step;
+any request of B's that needs one of them fails in that window.
+
+**The fix.** Render's deploy hooks accept a `ref` query parameter naming the commit to deploy, so
+the hook could ask for exactly the resolved SHA. Deferred because it has not been tested against
+this service: Render answers an invalid `ref` with a `400`, and a mistake there would break the
+first automatic deploy after the database had already migrated.
+
+### The statement timeout may not be in effect in production
+
+**The gap.** `apps/api/src/db/client.ts` gives the API's pool a 5-second `statement_timeout`, which
+`pg` sends as a connection startup parameter. Render's `DATABASE_URL` is meant to be Neon's pooled
+string, and Neon's pooler is PgBouncer, which by default refuses a connection whose startup packet
+carries a parameter it cannot track, and ignores such a parameter only when configured to.
+`statement_timeout` cannot be tracked: PgBouncer can only track parameters Postgres reports back
+to the client. The live API connects and is healthy, so either Render's `DATABASE_URL` is not the
+pooled string, or the pooler drops the parameter and the 5-second timeout exists only in tests and
+local development. Which of the two is true has not been checked.
+
+**What triggers it.** Any statement that runs long in production, such as a bad query plan or a
+long wait for a lock.
+
+**What happens.** If the parameter is dropped, nothing cancels that statement: it holds its pooled
+connection for as long as it runs, which is exactly what the timeout exists to prevent.
+
+**How to check.** See whether the host in Render's `DATABASE_URL` contains `-pooler`. Then run
+`SELECT current_setting('statement_timeout')` through `connectDatabase` with that same URL: `5s`
+means the timeout reaches Postgres, `0` means it was dropped on the way.
+
+**The fix, if it is dropped.** Set it on the database role, `ALTER ROLE … SET statement_timeout =
+'5s'`, which Postgres applies itself whatever the pooler forwards. The migration connection
+(`connectForMigrations`, used by `migrate.ts`) would then have to issue `SET statement_timeout = 0`
+explicitly, which its direct connection allows: today migrations run without a statement timeout
+only because they never send the parameter, and a role default would give them 5 seconds whenever
+they connect as that role.
+
+### `TRUST_PROXY` can be forged from inside Cloudflare's ranges
+
+**The gap.** `TRUST_PROXY` trusts every Cloudflare range, and Fastify treats every trusted address
+in `X-Forwarded-For` as one more proxy, taking the first untrusted address from the right as the
+client. A Cloudflare Worker that requests a site on another Cloudflare-hosted domain arrives from
+`2a06:98c0:3600::103`, which is inside the trusted `2a06:98c0::/29`, and a Worker can set its own
+`X-Forwarded-For` on that request. The API would skip the Worker's address as a trusted proxy and
+key the rate limiter on whatever address the Worker wrote.
+
+**What triggers it.** A free Cloudflare Workers account and a few lines of script. This is reasoned
+from Cloudflare's documented behaviour and was **not** tested against the live service. The
+experiments that settled the current value tested an ordinary client adding a forged header,
+which cannot pick its bucket
+(`worklog/2026-09-16T0633-three-trust-proxy-values-before-the-request-log-gave-the-rig.md`).
+
+**What happens.** The caller chooses its own rate-limit bucket on every request, so the limits of
+10 chatroom creates and 30 messages a minute stop applying to it.
+
+**The fix.** Key the limiter on `CF-Connecting-IP`, if Render passes that header through to the
+API — measure it in the request log first, the way `TRUST_PROXY` itself was settled — or trust at
+most one Cloudflare hop instead of any number of them. Even as it stands, the value is a large
+improvement on an untrusted proxy, where every visitor shared a handful of per-edge buckets.
 
 ## Free-tier realities
 
@@ -354,9 +456,14 @@ Exactly one API instance runs today. Running more than one would need:
 - **`TRUST_PROXY`'s Cloudflare ranges** (above) — last checked against `cloudflare.com/ips-v4` and
   `/ips-v6` on 2026-09-16. Drift here doesn't error; it silently returns rate limiting to shared,
   per-edge buckets.
-- **The pinned `netlify-cli@27.7.0`** in `deploy.yml` — resolved by `pnpm dlx` with no lockfile, so
-  bumping it is a deliberate edit, not something that happens on its own. `--version` resolving is
-  not evidence that `--dir`/`--package`/`--allow-build` still behave the same way on a new version
+- **The pinned `netlify-cli@27.7.0`** in `deploy.yml` — bumping the CLI itself is a deliberate
+  edit, but the pin does not freeze what runs. `pnpm dlx` has no lockfile and re-resolves the CLI's
+  whole dependency tree on every run, so a transitive dependency can change underneath the pin. The
+  deploy's CLI warm-up step (step 4 above) is the mitigation: it resolves and installs that tree
+  before production changes, so a change that breaks resolution or installation fails the deploy
+  first. A change that only alters what `deploy` does would still surface at the publish step. And
+  `--version` resolving is not evidence that `--dir`/`--package`/`--allow-build` still behave the
+  same way on a new version
   (`worklog/2026-09-16T1518-a-command-verified-with-version-was-not-the-command-that-run.md`).
 - **The Stadia Maps domain registration** — tied to `https://wolfchatter.netlify.app`; a future
   domain change needs re-registering there too.
