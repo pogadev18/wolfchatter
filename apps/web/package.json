@@ -31,6 +31,8 @@
     "@types/react": "19.3.0",
     "@types/react-dom": "19.3.0",
     "@vitejs/plugin-react": "6.1.1",
+    "@wolfchatter/worklog": "workspace:*",
+    "marked": "18.0.13",
     "pg": "8.23.0",
     "socket.io": "4.8.3",
     "tailwindcss": "4.3.3",

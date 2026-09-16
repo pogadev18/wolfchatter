@@ -1,6 +1,7 @@
 import tailwindcss from '@tailwindcss/vite'
 import react from '@vitejs/plugin-react'
 import { defineConfig } from 'vite'
+import { worklogPlugin } from './plugins/worklog.ts'
 import { parseWebEnv } from './src/env.ts'
 
 /** The API that `pnpm dev` starts (apps/api/.env.example). */
@@ -12,7 +13,7 @@ export default defineConfig(({ command }) => {
   parseWebEnv(process.env)
 
   return {
-    plugins: [react(), tailwindcss()],
+    plugins: [react(), tailwindcss(), worklogPlugin()],
     build: {
       rolldownOptions: {
         output: {
