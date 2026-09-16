@@ -1,4 +1,5 @@
 import { z } from 'zod'
+import { DEFAULT_MESSAGES_PER_MINUTE, DEFAULT_ROOMS_PER_MINUTE } from './http/limits.ts'
 
 const LOG_LEVELS = ['fatal', 'error', 'warn', 'info', 'debug', 'trace', 'silent'] as const
 const PROXY_RANGE_NAMES = ['loopback', 'linklocal', 'uniquelocal'] as const
@@ -9,6 +10,9 @@ const list = (value: string) =>
     .split(',')
     .map((entry) => entry.trim())
     .filter(Boolean)
+
+/** A whole number of requests a minute, at least one. */
+const perMinute = (fallback: number) => z.coerce.number().int().min(1).default(fallback)
 
 /** Environment variables the API reads. Everything except DATABASE_URL has a default. */
 export const envSchema = z.object({
@@ -48,6 +52,12 @@ export const envSchema = z.object({
         }),
       ),
     ),
+  /**
+   * Per-client write limits a minute. The PRD's values are the defaults, so a normal run and a
+   * deploy are unchanged; the end-to-end suite raises them, because its tests share one address.
+   */
+  RATE_LIMIT_ROOMS_PER_MINUTE: perMinute(DEFAULT_ROOMS_PER_MINUTE),
+  RATE_LIMIT_MESSAGES_PER_MINUTE: perMinute(DEFAULT_MESSAGES_PER_MINUTE),
   /** Set by Render on every deploy. `GET /api/health` reports it so deploys can be verified. */
   RENDER_GIT_COMMIT: z.string().min(1).optional(),
 })

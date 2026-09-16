@@ -62,6 +62,27 @@ describe('createMessageInputSchema', () => {
     expect(firstError('ana', `hel${nul}lo`)).toBe('Messages cannot contain NUL characters')
   })
 
+  it('FR-5: rejects unpaired surrogates, which Postgres would store as U+FFFD', () => {
+    const highSurrogate = String.fromCharCode(0xd83d)
+    const lowSurrogate = String.fromCharCode(0xde00)
+    const firstError = (author: string, body: string) =>
+      createMessageInputSchema.safeParse({ id, author, body }).error?.issues[0]?.message
+
+    expect(firstError(`ana${highSurrogate}`, 'hello')).toBe(
+      'User names cannot contain unpaired surrogate characters',
+    )
+    expect(firstError('ana', `${lowSurrogate}hello`)).toBe(
+      'Messages cannot contain unpaired surrogate characters',
+    )
+  })
+
+  it('FR-5: accepts emoji, whose surrogate pairs are well formed', () => {
+    const grinningFace = String.fromCodePoint(0x1f600)
+    const input = { id, author: `ana ${grinningFace}`, body: `hello ${grinningFace}` }
+
+    expect(createMessageInputSchema.parse(input)).toEqual(input)
+  })
+
   it('requires a UUID so retried requests can be deduplicated', () => {
     expect(
       createMessageInputSchema.safeParse({ id: '42', author: 'ana', body: 'hi' }).success,

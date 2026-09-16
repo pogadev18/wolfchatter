@@ -14,6 +14,8 @@ import type { Api } from '../app.ts'
 import { messages } from '../db/schema.ts'
 
 const NUL = String.fromCharCode(0)
+const UNPAIRED_SURROGATE = String.fromCharCode(0xd83d)
+const GRINNING_FACE = String.fromCodePoint(0x1f600)
 
 let database: TestDatabase
 let api: Api
@@ -81,6 +83,21 @@ describe('POST /api/rooms/:id/messages', () => {
     expect(response.json()).toMatchObject({ error: { code: 'VALIDATION_FAILED' } })
   })
 
+  it('FR-5: rejects an unpaired surrogate, which Postgres would store as U+FFFD', async () => {
+    const response = await postMessage({
+      id: randomUUID(),
+      author: 'ana',
+      body: `hello ${UNPAIRED_SURROGATE}`,
+    })
+
+    expect(response.statusCode).toBe(400)
+    expect(apiErrorResponseSchema.parse(response.json()).error).toMatchObject({
+      code: 'VALIDATION_FAILED',
+      message: 'Messages cannot contain unpaired surrogate characters',
+    })
+    expect((await listMessages()).json()).toEqual([])
+  })
+
   it('FR-4: answers 404 for a chatroom that does not exist', async () => {
     const response = await postMessage(
       { id: randomUUID(), author: 'ana', body: 'hi' },
@@ -100,6 +117,16 @@ describe('POST /api/rooms/:id/messages', () => {
     expect(retry.statusCode).toBe(201)
     expect(retry.json()).toEqual(first.json())
     expect((await listMessages()).json()).toHaveLength(1)
+  })
+
+  it('returns the same message when a send with an emoji is retried', async () => {
+    const body = { id: randomUUID(), author: 'ana', body: `hello ${GRINNING_FACE}` }
+
+    const first = await postMessage(body)
+    const retry = await postMessage(body)
+
+    expect(retry.statusCode).toBe(201)
+    expect(retry.json()).toEqual(first.json())
   })
 
   it('returns the same message when a send to an uppercase room id is retried', async () => {

@@ -12,7 +12,27 @@ describe('parseEnv', () => {
       LOG_LEVEL: 'info',
       CORS_ORIGINS: ['http://localhost:5173'],
       TRUST_PROXY: [],
+      RATE_LIMIT_ROOMS_PER_MINUTE: 10,
+      RATE_LIMIT_MESSAGES_PER_MINUTE: 30,
     })
+  })
+
+  it('reads write limits that differ from the PRD, as the end-to-end run needs', () => {
+    const env = parseEnv({
+      DATABASE_URL,
+      RATE_LIMIT_ROOMS_PER_MINUTE: '1000',
+      RATE_LIMIT_MESSAGES_PER_MINUTE: '2000',
+    })
+    expect(env).toMatchObject({
+      RATE_LIMIT_ROOMS_PER_MINUTE: 1000,
+      RATE_LIMIT_MESSAGES_PER_MINUTE: 2000,
+    })
+  })
+
+  it.each(['0', '-1', '1.5', 'plenty'])('rejects %j as a write limit', (limit) => {
+    expect(() => parseEnv({ DATABASE_URL, RATE_LIMIT_ROOMS_PER_MINUTE: limit })).toThrow(
+      /RATE_LIMIT_ROOMS_PER_MINUTE/,
+    )
   })
 
   it('reads the port and the commit Render deploys', () => {

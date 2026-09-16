@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" role="img" aria-label="Wolfchatter">
+  <title>Wolfchatter</title>
+  <rect width="32" height="32" rx="7" fill="#f5f5f4" />
+  <path
+    d="M16 4.5c-4.42 0-8 3.47-8 7.75 0 5.6 7.06 14.03 7.36 14.39a.84.84 0 0 0 1.28 0C16.94 26.28 24 17.85 24 12.25c0-4.28-3.58-7.75-8-7.75Z"
+    fill="#be123c"
+  />
+  <circle cx="16" cy="12.25" r="3.1" fill="#f5f5f4" />
+</svg>

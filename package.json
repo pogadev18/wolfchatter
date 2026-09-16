@@ -9,15 +9,16 @@
     "node": ">=24.11.0"
   },
   "scripts": {
-    "check": "pnpm lint && pnpm typecheck && pnpm test && pnpm worklog:check",
+    "check": "pnpm lint && pnpm typecheck && pnpm test && pnpm test:e2e && pnpm worklog:check",
     "db:down": "docker compose down",
     "db:generate": "pnpm --filter @wolfchatter/api db:generate",
     "db:migrate": "pnpm --filter @wolfchatter/api db:migrate",
     "db:up": "docker compose up --detach --wait",
-    "dev": "pnpm db:up && pnpm db:migrate && pnpm --filter @wolfchatter/api dev",
+    "dev": "pnpm db:up && pnpm db:migrate && pnpm --parallel --filter @wolfchatter/api --filter @wolfchatter/web dev",
     "format": "biome check --write .",
     "lint": "biome check .",
     "test": "vitest run",
+    "test:e2e": "pnpm --filter @wolfchatter/web test:e2e",
     "typecheck": "tsc --noEmit -p tsconfig.json && pnpm -r typecheck",
     "worklog:check": "node packages/worklog/src/cli/check.ts",
     "worklog:new": "node packages/worklog/src/cli/new.ts"
