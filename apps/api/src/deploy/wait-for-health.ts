@@ -14,7 +14,7 @@ export interface WaitForHealthOptions {
   pollIntervalMs?: number
 }
 
-/** Everything the poll loop reads from the outside world, injected so tests never wait on real time. */
+/** Everything the poll loop reads from outside, injected so no test has to wait on real time. */
 export interface WaitForHealthDependencies {
   fetch: (url: string) => Promise<Response>
   now: () => number
