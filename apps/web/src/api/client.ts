@@ -59,13 +59,29 @@ export interface ApiClient {
 
 export interface ApiClientOptions {
   fetchFn?: typeof fetch
-  /** How long a request waits for an answer before it gives up. Render's free tier can take
-   * about 30 seconds to wake from sleep, so a shorter deadline would fail a routine cold start. */
+  /** How long a single request waits for an answer before it gives up (see `DEFAULT_TIMEOUT_MS`
+   * for what the default has to cover, and why it alone is not the whole story). */
   timeoutMs?: number
 }
 
-/** Every request's default deadline (see `ApiClientOptions.timeoutMs`). */
-const DEFAULT_TIMEOUT_MS = 10_000
+/**
+ * Every request's default deadline. One attempt cannot, by itself, span a full cold start: Render's
+ * free tier takes about a minute to wake (PRD §7's "Risks & assumptions"; `connection-status.ts`'s
+ * "Waking up the server…" text; a real cold start measured against the live API today took 33s).
+ * What actually has to cover that minute is this deadline *combined with* the unchanged retry
+ * policy in `query-client.ts` — traced from `@tanstack/query-core`'s retryer (`failureCount < N` is
+ * N retries, i.e. N+1 attempts, and `retry`/`retryDelay` are evaluated with `failureCount` *before*
+ * it increments) and confirmed by timing the real library with a stubbed, slow request: a mutation
+ * makes 3 attempts with 1s then 2s of backoff between them; a query makes 4 attempts with 1s, 2s,
+ * then 4s. At 30s per attempt that puts a mutation's total span at 3 × 30s + 3s = 93s and a query's
+ * at 4 × 30s + 7s = 127s — both comfortably past a one-minute wake, and each retry is a fresh
+ * request that succeeds as soon as the instance actually answers, not a full new cycle. What this
+ * number does not do on its own: a *single* attempt still only waits 30s, so a request sent right
+ * as the instance starts waking can still need a second attempt before one lands on an instance
+ * that has finished booting. That's fine here — mutations show "Sending…" for the whole retry
+ * sequence, not a premature failure, and only report "Not sent" once every attempt above is spent.
+ */
+export const DEFAULT_TIMEOUT_MS = 30_000
 
 /**
  * An `AbortSignal` that fires on its own after `ms`, built on `setTimeout` rather than

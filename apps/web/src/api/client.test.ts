@@ -2,6 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import {
   ApiRequestError,
   createApiClient,
+  DEFAULT_TIMEOUT_MS,
   describeFailure,
   isPermanentFailure,
   isTemporaryFailure,
@@ -144,6 +145,10 @@ describe('a request that never answers', () => {
         }),
     )
   }
+
+  it('defaults the request timeout to 30 seconds', () => {
+    expect(DEFAULT_TIMEOUT_MS).toBe(30_000)
+  })
 
   it('gives up once the timeout elapses, on a request that carries a signal', async () => {
     const fetchFn = hangingFetchFn()
