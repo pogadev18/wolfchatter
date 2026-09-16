@@ -100,5 +100,17 @@ describe('parseEnv', () => {
         }),
       ).not.toThrow()
     })
+
+    it('rejects an empty DATABASE_URL with the aggregated error, not a raw TypeError', () => {
+      expect(() => parseEnv({ DATABASE_URL: '' })).toThrow(
+        /Invalid environment variables:\n.*DATABASE_URL/,
+      )
+    })
+
+    it('rejects a non-URL DATABASE_URL with the aggregated error, not a raw TypeError', () => {
+      expect(() => parseEnv({ DATABASE_URL: 'somestring' })).toThrow(
+        /Invalid environment variables:\n.*DATABASE_URL/,
+      )
+    })
   })
 })

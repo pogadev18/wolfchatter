@@ -30,6 +30,10 @@ function isLoopbackHost(hostname: string): boolean {
  * API and a local Postgres for a certificate to protect against.
  */
 function hasVerifiedTlsOrIsLoopback(value: string): boolean {
+  // zod runs every check in the chain regardless of whether an earlier one already failed, so
+  // this must not throw on a value z.url() has already rejected (CORS_ORIGINS, below, guards
+  // its own `new URL()` the same way).
+  if (!URL.canParse(value)) return false
   const url = new URL(value)
   return isLoopbackHost(url.hostname) || url.searchParams.get('sslmode') === 'verify-full'
 }
