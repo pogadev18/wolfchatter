@@ -54,10 +54,13 @@ export function App() {
           onSelectRoom={handleSelectRoom}
           onCreateRoom={handleCreateRoom}
         />
-        {/* The map alone would look empty rather than broken. Above Leaflet's controls (1000). */}
+        {/*
+          The map alone would look empty rather than broken. Above Leaflet's controls (1000),
+          right of the zoom buttons, and left of the floating panel on wide screens.
+        */}
         {rooms.isError && (
-          <p className="pointer-events-none absolute inset-x-0 top-4 z-[1100] text-center">
-            <span className="rounded bg-white/90 px-3 py-1 text-red-700 text-sm shadow">
+          <p className="pointer-events-none absolute top-4 right-4 left-14 z-[1100] text-center sm:right-[26rem]">
+            <span className="inline-block rounded bg-white/90 px-3 py-1 text-red-700 text-sm shadow">
               {ROOMS_UNAVAILABLE}
             </span>
           </p>
