@@ -7,7 +7,7 @@ phase: web
 task: M4-T4
 outcome: win
 commits: ['bbe5b5e', '5cedf20', 'fe72ac4']
-related: []
+related: ['2026-09-16T1033-a-10-second-default-timeout-couldn-t-cover-the-cold-start-it']
 ---
 
 ## What happened
