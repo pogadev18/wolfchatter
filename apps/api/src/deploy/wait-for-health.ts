@@ -22,17 +22,21 @@ export interface WaitForHealthDependencies {
 }
 
 /**
- * Polls `options.url` until its health response reports `options.expectedCommit`, or the
- * timeout expires. The deploy hook's 200 only means Render *accepted* the request to build —
- * this is the only evidence a deploy actually landed.
+ * Polls `options.url` until its health response reports both `ok: true` and
+ * `options.expectedCommit`, or the timeout expires. The deploy hook's 200 only means Render
+ * *accepted* the request to build — this is the only evidence a deploy actually landed and can
+ * serve traffic.
  *
- * Every response body is validated with `healthResponseSchema` before its `commit` field is
- * trusted: a proxy's HTML error page, a dropped connection, or a mid-deploy 503 must all be
- * treated the same way — keep polling — rather than crash the wait.
+ * Every response body is validated with `healthResponseSchema` before its fields are trusted: a
+ * proxy's HTML error page, a dropped connection, or a mid-deploy 503 must all be treated the same
+ * way — keep polling — rather than crash the wait.
  *
- * The HTTP status code itself is never inspected. A response can be a well-formed 503
- * (`db: "down"`) and still report the right commit — the code is live even if the database
- * check inside it is failing — and that counts as success.
+ * `ok` is required alongside the commit match, not just the commit: `apps/api/src/health.ts`
+ * reports the deployed commit regardless of database state, so a matching commit alone does not
+ * mean the API can actually serve a request. A 503 with the right commit is still a deploy that
+ * cannot serve — the correct response is to keep polling, same as a mismatch, not to call it
+ * done. If the database outage is transient, polling recovers on its own well inside the
+ * timeout; if it isn't, the timeout surfaces that honestly instead of a false success.
  */
 export async function waitForHealth(
   options: WaitForHealthOptions,
@@ -47,30 +51,38 @@ export async function waitForHealth(
   let lastSeenCommit: string | null | undefined
 
   while (true) {
-    const commit = await pollOnce(deps.fetch, options.url)
-    if (commit !== undefined) lastSeenCommit = commit
-    if (commit === options.expectedCommit) return
+    const seen = await pollOnce(deps.fetch, options.url)
+    if (seen !== undefined) lastSeenCommit = seen.commit
+    if (seen?.ok && seen.commit === options.expectedCommit) return
 
     if (deps.now() >= deadline) {
-      const seen = lastSeenCommit === undefined ? 'no valid response' : `commit ${lastSeenCommit}`
+      const description =
+        lastSeenCommit === undefined ? 'no valid response' : `commit ${lastSeenCommit}`
       throw new Error(
         `Timed out after ${timeoutMs}ms waiting for ${options.url} to report commit ` +
-          `${options.expectedCommit} (last saw ${seen})`,
+          `${options.expectedCommit} (last saw ${description})`,
       )
     }
     await deps.sleep(pollIntervalMs)
   }
 }
 
+/** What one health-check attempt found, once its body has passed schema validation. */
+interface HealthSighting {
+  ok: boolean
+  commit: string | null
+}
+
 /**
- * One health-check attempt. Returns the reported commit, or `undefined` for anything that is not
- * a schema-valid health response — a network failure, a proxy's HTML error page and a malformed
- * body all collapse to the same "try again" signal, so the caller does not need to tell them apart.
+ * One health-check attempt. Returns the reported `ok` and `commit`, or `undefined` for anything
+ * that is not a schema-valid health response — a network failure, a proxy's HTML error page and a
+ * malformed body all collapse to the same "try again" signal, so the caller does not need to tell
+ * them apart.
  */
 async function pollOnce(
   fetchImpl: (url: string) => Promise<Response>,
   url: string,
-): Promise<string | null | undefined> {
+): Promise<HealthSighting | undefined> {
   let response: Response
   try {
     response = await fetchImpl(url)
@@ -86,7 +98,7 @@ async function pollOnce(
   }
 
   const result = healthResponseSchema.safeParse(body)
-  return result.success ? result.data.commit : undefined
+  return result.success ? { ok: result.data.ok, commit: result.data.commit } : undefined
 }
 
 // --- CLI entry point ---

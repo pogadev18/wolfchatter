@@ -76,6 +76,22 @@ describe('waitForHealth', () => {
     expect(fetch).toHaveBeenCalledTimes(2)
   })
 
+  it('keeps polling a 503 that already reports the expected commit, then resolves once ok', async () => {
+    const fetch = vi
+      .fn()
+      .mockResolvedValueOnce(
+        healthResponse({ ok: false, db: 'down', commit: EXPECTED_COMMIT }, 503),
+      )
+      .mockResolvedValueOnce(healthResponse({ ok: true, db: 'up', commit: EXPECTED_COMMIT }))
+
+    await waitForHealth(
+      { url: HEALTH_URL, expectedCommit: EXPECTED_COMMIT, pollIntervalMs: 1_000 },
+      { fetch, ...fakeClock() },
+    )
+
+    expect(fetch).toHaveBeenCalledTimes(2)
+  })
+
   it('keeps polling when the body fails schema validation, such as a proxy error page', async () => {
     const fetch = vi
       .fn()
