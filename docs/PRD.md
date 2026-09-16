@@ -24,7 +24,7 @@ IDs are referenced by plan tasks, test names and the review report.
 - **Accessibility & layout:** labelled inputs, new messages announced through a polite live region, focus moved to the message input on room switch; the panel becomes a bottom sheet below 640 px.
 - **Quality:** strict TypeScript, test-first API and core logic, green CI before every deploy.
 
-**Out of scope.** Accounts, moderation, empty-room cleanup, marker clustering, paging older messages in the UI, and a deployed staging or multi-instance setup (designed in `INFRASTRUCTURE.md`).
+**Out of scope.** Accounts, moderation, empty-room cleanup, marker clustering, paging older messages in the UI, and a deployed staging or multi-instance setup (designed in [`INFRASTRUCTURE.md`](INFRASTRUCTURE.md)).
 
 ## 2. Stack & architecture
 
@@ -79,15 +79,15 @@ Socket  client → room:join(id, ack), room:leave(id, ack), acknowledged with
 ## 6. Delivery & AI workflow
 
 - **Local & CI:** `pnpm install`, then `pnpm dev`, which starts Docker Postgres, applies migrations and runs web and API together. Every PR and push runs lint, typecheck, unit and integration tests against Postgres, build, Playwright and a work-log check.
-- **Production only, for now:** on green CI, GitHub Actions deploys the API to Render, waits for `/api/health` to report the commit, then deploys the web app to Netlify. Staging is designed in `INFRASTRUCTURE.md`.
+- **Production only, for now:** on green CI, GitHub Actions deploys the API to Render, waits for `/api/health` to report the commit, then deploys the web app to Netlify. Staging is designed in [`INFRASTRUCTURE.md`](INFRASTRUCTURE.md).
 - **AI workflow:** `CLAUDE.md` defines conventions and "done", `AGENTS.md` points other tools to it, and `.claude/` holds settings, hooks (format on edit, work-log reminder), the `worklog` and `self-review` skills and a `code-reviewer` agent. Work flows PRD → plan → one subagent per task with review → one PR per milestone.
 - **Work log:** one Markdown file per entry in `worklog/`, with frontmatter validated by zod (`title`, `date`, `agent`, `phase`, `task`, `outcome: win | issue | decision | learning`, `severity` for issues, `commits`, `related`). At least one entry per task, plus every failed attempt and non-obvious decision.
 - **Self review:** parallel reviewers per concern plus a verification pass produce `docs/review/REPORT.md`, with an FR → code → test matrix and fixed / not-fixed notes.
 
 ## 7. Risks & assumptions
 
-- **Stadia tiles need a registered domain in production:** register the Netlify domain; OSM fallback.
-- **Render's free tier sleeps (~1 min cold start):** health ping and "waking up" banner; paid instance in the infra plan.
+- **Stadia tiles, measured:** any `Referer` is served and a request with none gets a 401 — the real risk is a `Referrer-Policy: no-referrer` somewhere in the stack, not an unregistered domain; OSM fallback.
+- **Render's free tier sleeps (33s cold start, measured):** health ping and "waking up" banner; paid instance in the infra plan.
 - **A tool doesn't support TypeScript 7 yet:** fall back to TypeScript 6.0 while scaffolding.
 - **Spam without accounts:** per-IP rate limits (with the API trusting Render's proxy for client IPs); moderation is out of scope.
 - **Assumptions:** demo-level traffic, one API instance, anonymous self-chosen names, timestamps in the viewer's locale.

@@ -24,8 +24,8 @@ Real-time chat on a map, built for the Wolfpack Digital full-stack test. **Read 
 
 - `packages/shared`: zod schemas and types for REST payloads, errors and socket events. Contract changes start here.
 - `packages/worklog`: work-log schema, parser, validator, CLIs and the Stop-hook logic.
-- `apps/api`: Fastify routes and services per domain (`src/rooms/`, `src/messages/`), Socket.IO fan-out (`src/realtime/`), the Drizzle schema (`src/db/`) and generated migrations (`drizzle/`). Test helpers live in `apps/api/test/`.
-- `apps/web`: React 19 and Vite 8. `src/map/` (Leaflet map, pins, clicks), `src/rooms/` and `src/messages/` (queries, optimistic writes, the chat panel's parts), `src/realtime/` (socket, cache sync, connection status) and `src/panel/`. End-to-end tests live in `apps/web/e2e/`, and test helpers in `apps/web/test/`.
+- `apps/api`: Fastify routes and services per domain (`src/rooms/`, `src/messages/`), Socket.IO fan-out (`src/realtime/`), the Drizzle schema (`src/db/`) and generated migrations (`drizzle/`), and the deploy workflow's health poller (`src/deploy/`). Test helpers live in `apps/api/test/`.
+- `apps/web`: React 19 and Vite 8. `src/map/` (Leaflet map, pins, clicks), `src/rooms/` and `src/messages/` (queries, optimistic writes, the chat panel's parts), `src/realtime/` (socket, cache sync, connection status), `src/panel/` and `src/devlog/` (the `/devlog` timeline). `plugins/` holds the build-time Vite plugin that turns `worklog/*.md` into `virtual:worklog`. End-to-end tests live in `apps/web/e2e/`, and test helpers in `apps/web/test/`.
 - `worklog/`: one Markdown file per work-log entry, rendered at `/devlog`.
 - `docs/`: PRD, plans, and later infrastructure and review docs.
 - `.claude/`: settings, hooks and skills for Claude Code.
