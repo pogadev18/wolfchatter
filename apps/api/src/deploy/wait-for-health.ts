@@ -68,14 +68,16 @@ export async function waitForHealth(
   // message below needs to tell those two situations apart.
   let lastSeenCommit: string | null | undefined
 
-  while (deps.now() < deadline) {
-    const attemptMs = Math.min(deadline - deps.now(), MAX_ATTEMPT_MS)
-    const seen = await pollWithin(deps, options.url, attemptMs)
+  while (true) {
+    // Read once and used as read, so an attempt never gets a budget of zero or less.
+    const remainingMs = deadline - deps.now()
+    if (remainingMs <= 0) break
+    const seen = await pollWithin(deps, options.url, Math.min(remainingMs, MAX_ATTEMPT_MS))
     if (seen !== undefined) lastSeenCommit = seen.commit
     if (seen?.ok && seen.commit === options.expectedCommit) return
 
-    const remainingMs = deadline - deps.now()
-    if (remainingMs > 0) await deps.sleep(Math.min(pollIntervalMs, remainingMs))
+    const untilDeadlineMs = deadline - deps.now()
+    if (untilDeadlineMs > 0) await deps.sleep(Math.min(pollIntervalMs, untilDeadlineMs))
   }
 
   const description =
