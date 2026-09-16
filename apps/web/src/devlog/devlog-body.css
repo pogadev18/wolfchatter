@@ -19,24 +19,24 @@
   margin-bottom: 0;
 }
 
-.devlog-body h1,
-.devlog-body h2,
-.devlog-body h3,
-.devlog-body h4 {
+/*
+ * Body headings arrive as h4-h6 only: plugins/render-body.ts shifts them below the entry card's own
+ * h3 title in the document outline. h4 is a `##` section, the level every entry uses, and keeps
+ * the size a `##` had before the shift.
+ */
+.devlog-body h4,
+.devlog-body h5,
+.devlog-body h6 {
   font-weight: 600;
   margin: 1em 0 0.4em;
 }
 
-.devlog-body h1 {
-  font-size: 1.25em;
-}
-
-.devlog-body h2 {
+.devlog-body h4 {
   font-size: 1.15em;
 }
 
-.devlog-body h3,
-.devlog-body h4 {
+.devlog-body h5,
+.devlog-body h6 {
   font-size: 1em;
 }
 
