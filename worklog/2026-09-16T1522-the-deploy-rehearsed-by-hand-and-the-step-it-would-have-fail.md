@@ -17,17 +17,24 @@ on the **default branch**. The plan identified that trap for the automatic trigg
 though the manual one escaped it. The user found it by looking for a Deploy workflow in the Actions
 tab and not seeing one. D9 is struck through in the plan rather than rewritten.
 
-So the rehearsal ran each step's real command by hand, in the workflow's order, against the real
-providers:
+So the rehearsal ran the deploy by hand, in the workflow's order, against the real providers, but
+not every step of it. This entry first said each step's real command ran; a later review found two
+that did not. The **migrate step never ran**: `pnpm db:migrate` last ran against Neon at setup, from
+a laptop, before T3's TLS rule existed, so the GitHub `DATABASE_URL` secret first meets that rule in
+the first automatic deploy. And the plan's **cold-start check**, "Waking up the server…" on a
+genuinely slept instance, was not done; the 33-second timings below measure the wake, not what the
+app shows during it. What did run:
 
 | Step | What ran | Result |
 |---|---|---|
 | CI | PR #4 on GitHub's runners | green: drift check, full-history checkout, 48 Playwright specs |
+| Migrate | **not run** | the workflow's `pnpm db:migrate` step first runs in the first automatic deploy |
 | API | Render pointed at `m4-golive`, Manual Deploy | booted under the new TLS rule; `db: "up"` |
 | Health | `node apps/api/src/deploy/wait-for-health.ts --commit 5e842d1…` | held through the old commit, resolved when Render served the branch: 18:07:53 → 18:11:06 |
 | Build | `VITE_API_URL=… pnpm --filter @wolfchatter/web build` | 321 ms; API origin in the bundle; 44 distinct commit SHAs in the devlog chunk |
 | Publish | the workflow's exact `netlify deploy` command, from `apps/web` | **failed**, then published with one argument changed |
 | Live | curl, then the app's own browser, then the user in two browsers | all green — below |
+| Cold start | **not run** | "Waking up the server…" on a slept instance, deferred to after the merge |
 
 The publish failed with `Deploy path: /Users/pogadev18/Developer/wolfpack-challenge/dist` — the
 repository root. The step runs from `apps/web`, and its comment said `dist` "resolves relative to
@@ -65,7 +72,8 @@ to boot. That would now show up as a failed deploy on a branch nobody serves, no
 ## Takeaway
 
 **Rehearse the real commands against the real providers, in order.** The failure sat at the last
-step of the chain, so only a rehearsal that ran every step before it would reach it. Confirming a
+step of the chain, so only a rehearsal that got that far would reach it. Getting there by skipping a
+step, as this one skipped the migration, leaves that step to meet production untested. Confirming a
 command with a harmless flag proves the binary resolves, and nothing about the arguments that do
 the work.
 
