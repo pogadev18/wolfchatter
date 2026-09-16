@@ -68,7 +68,8 @@ Actions build step, not in Netlify.
 | `TRUST_PROXY` | `loopback,uniquelocal` plus Cloudflare's published ranges (below) | Which hops' `X-Forwarded-For` are trusted for the client's real address |
 | `LOG_LEVEL` | `info` | Pino's log verbosity |
 | `COREPACK_ENABLE_DOWNLOAD_PROMPT` | `0` | Render's build installs pnpm through corepack; this silences an interactive download prompt that has no TTY to answer |
-| `HOST`, `PORT` | left at `env.ts`'s own defaults (`0.0.0.0`, `3000`) | Not set explicitly. Render injects its own `PORT` (default `10000`, overridable) and, per Render's docs, "is usually able to detect" whatever port a service actually binds to — which is why this works without the API reading Render's variable by name |
+| `HOST` | left at `env.ts`'s own default, `0.0.0.0` | Not set explicitly; a container needs to accept connections on every interface, not just loopback |
+| `PORT` | not set by this project; Render injects its own `PORT` automatically (`10000` by default) | `env.ts` already reads `process.env.PORT`, falling back to `3000` only when it's absent (local dev) — so Render's real value is used with no project-side configuration |
 | `RENDER_GIT_COMMIT` | set automatically by Render, not configured here | `GET /api/health` reports it, which is what `wait-for-health.ts` polls for during a deploy |
 
 ### Neon (the database)
@@ -94,7 +95,7 @@ gates a tile request — see the PRD's corrected risk note and the Gotchas in `C
 |---|---|---|---|
 | Secret | `DATABASE_URL` | Neon's **direct** connection string, `sslmode=verify-full` | Grants full read/write access to the database |
 | Secret | `RENDER_DEPLOY_HOOK_URL` | Render's deploy-hook URL | Anyone holding it can trigger a deploy |
-| Secret | `NETLIFY_AUTH_TOKEN` | A Netlify auth token | Grants publish access to the Netlify account |
+| Secret | `NETLIFY_AUTH_TOKEN` | A Netlify auth token | Grants API access to the Netlify account; this workflow only uses it to publish |
 | Variable | `API_ORIGIN` | `https://wolfchatter-api.onrender.com` | An origin, not a credential — and printing it in a deploy log is worth more than hiding it |
 | Variable | `NETLIFY_SITE_ID` | The Netlify site's id | Identifies which site to publish to; grants nothing by itself |
 
