@@ -34,6 +34,12 @@ export interface ConnectionTimeouts {
    * inheriting a bound sized for requests.
    */
   statementTimeoutMs?: number
+  /**
+   * How long a statement may wait for a lock before Postgres cancels it with `55P03`
+   * (lock_not_available). Unset leaves Postgres's own default, which is no limit; migrations set
+   * one (`MIGRATION_LOCK_TIMEOUT_MS` in `migrations.ts` says why).
+   */
+  lockTimeoutMs?: number
 }
 
 /**
@@ -43,7 +49,7 @@ export interface ConnectionTimeouts {
 export function connectDatabase(
   url: string,
   onIdleError: (error: Error) => void,
-  { statementTimeoutMs = STATEMENT_TIMEOUT_MS }: ConnectionTimeouts = {},
+  { statementTimeoutMs = STATEMENT_TIMEOUT_MS, lockTimeoutMs }: ConnectionTimeouts = {},
 ): DatabaseConnection {
   // 10 seconds covers a serverless database waking up, and a host named `localhost`, which on
   // macOS sometimes takes 5 seconds to resolve.
@@ -51,6 +57,7 @@ export function connectDatabase(
     connectionString: url,
     connectionTimeoutMillis: 10_000,
     statement_timeout: statementTimeoutMs,
+    lock_timeout: lockTimeoutMs,
   })
   pool.on('error', onIdleError)
   return { db: drizzle({ client: pool }), pool }

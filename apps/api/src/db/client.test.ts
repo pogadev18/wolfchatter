@@ -57,4 +57,28 @@ describe('connectDatabase', () => {
 
     await expect(db.execute(sql`SELECT 1 AS one`)).resolves.toMatchObject({ rows: [{ one: 1 }] })
   })
+
+  it('gives up waiting for a lock after the lock timeout with Postgres 55P03', async () => {
+    const { db, pool } = connectDatabase(
+      database.url,
+      (error) => {
+        throw error
+      },
+      { lockTimeoutMs: 200 },
+    )
+    onTestFinished(() => pool.end())
+    // Holds the lock an ALTER TABLE would need, as a long-running transaction could. Registered
+    // after the pool, so its rollback runs first and nothing is left waiting when the pool ends.
+    const holder = await database.pool.connect()
+    onTestFinished(async () => {
+      await holder.query('ROLLBACK')
+      holder.release()
+    })
+    await holder.query('BEGIN')
+    await holder.query('LOCK TABLE rooms IN ACCESS EXCLUSIVE MODE')
+
+    await expect(db.execute(sql`SELECT count(*) FROM rooms`)).rejects.toMatchObject({
+      cause: { code: '55P03' },
+    })
+  })
 })
