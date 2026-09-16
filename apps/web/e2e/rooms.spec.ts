@@ -236,6 +236,39 @@ test('FR-4: the URL keeps the selection, in canonical form, across a reload', as
   await expect(pinNamed(page, 'Chatroom 1')).toHaveClass(/room-pin--selected/)
 })
 
+test('FR-4: selecting and deselecting a chatroom keeps every other query parameter', async ({
+  page,
+  database,
+}) => {
+  const room = await database.createRoom(CLUJ)
+  await page.goto('/?utm_source=test')
+
+  await pinNamed(page, 'Chatroom 1').click()
+
+  await expect(page.getByRole('heading', { name: 'Chatroom 1' })).toBeVisible()
+  await expect(page).toHaveURL(`/?utm_source=test&room=${room.id}`)
+
+  // A create failure deselects through the same updater as a manual deselect (`withRoomDeselected`).
+  await page.route('**/api/rooms', (route) =>
+    route.request().method() === 'POST'
+      ? route.fulfill({
+          status: 409,
+          json: {
+            error: {
+              code: 'CONFLICT',
+              message: 'This chatroom id is already used by another chatroom',
+            },
+          },
+        })
+      : route.continue(),
+  )
+  const click = await mapPoint(page, { x: -200, y: 100 })
+  await page.mouse.click(click.x, click.y)
+
+  await expect(page.getByRole('complementary', { name: 'Chat' }).getByRole('alert')).toBeVisible()
+  await expect(page).toHaveURL('/?utm_source=test')
+})
+
 test('FR-4: an unknown or malformed chatroom id shows "Chatroom not found"', async ({ page }) => {
   const panel = page.getByRole('complementary', { name: 'Chat' })
 
