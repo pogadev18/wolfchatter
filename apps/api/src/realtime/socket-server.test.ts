@@ -138,3 +138,57 @@ describe('Socket.IO fan-out', () => {
     await expect(connect({ transports: ['polling'] })).rejects.toThrow()
   })
 })
+
+describe('room:join cap', () => {
+  const MAX_JOINED_ROOMS = 10
+
+  async function joinMany(client: ClientSocket, count: number) {
+    const acks = []
+    for (let index = 0; index < count; index++) {
+      acks.push(await client.emitWithAck('room:join', randomUUID()))
+    }
+    return acks
+  }
+
+  it('allows joining up to the cap', async () => {
+    const client = await connect()
+
+    const acks = await joinMany(client, MAX_JOINED_ROOMS)
+
+    expect(acks).toEqual(Array(MAX_JOINED_ROOMS).fill({ ok: true }))
+  })
+
+  it('refuses the next join over the cap', async () => {
+    const client = await connect()
+    await joinMany(client, MAX_JOINED_ROOMS)
+
+    const ack = await client.emitWithAck('room:join', randomUUID())
+
+    expect(ack).toEqual({
+      ok: false,
+      error: { code: 'RATE_LIMITED', message: expect.stringContaining(String(MAX_JOINED_ROOMS)) },
+    })
+  })
+
+  it('frees a slot on room:leave, so a join succeeds again', async () => {
+    const client = await connect()
+    const roomToLeave = randomUUID()
+    await client.emitWithAck('room:join', roomToLeave)
+    await joinMany(client, MAX_JOINED_ROOMS - 1)
+
+    await client.emitWithAck('room:leave', roomToLeave)
+    const ack = await client.emitWithAck('room:join', randomUUID())
+
+    expect(ack).toEqual({ ok: true })
+  })
+
+  it('gives a second socket its own allowance', async () => {
+    const first = await connect()
+    const second = await connect()
+    await joinMany(first, MAX_JOINED_ROOMS)
+
+    const ack = await second.emitWithAck('room:join', randomUUID())
+
+    expect(ack).toEqual({ ok: true })
+  })
+})
