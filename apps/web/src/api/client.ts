@@ -27,7 +27,11 @@ export class ApiRequestError extends Error {
   }
 }
 
-/** Worth retrying at once: the request never got an answer, or the server failed (5xx). */
+/**
+ * Worth retrying at once: the request never got an answer, the server failed (5xx), or a 2xx
+ * body broke the contract, which the schema throws a `ZodError` for. Retrying that last one is
+ * safe because the API's writes are idempotent: the same id sent again returns the stored row.
+ */
 export function isTemporaryFailure(error: unknown): boolean {
   return !(error instanceof ApiRequestError) || error.status >= 500
 }

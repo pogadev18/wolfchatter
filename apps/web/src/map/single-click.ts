@@ -1,4 +1,9 @@
-/** How long a click waits for a second one before it counts as a single click. */
+/**
+ * How long a click waits for a second one before it counts as a single click. Browsers use a
+ * platform threshold of about 500 ms for `dblclick`, so a deliberate double-click slower than
+ * this window creates a chatroom as it zooms. 300 ms is the accepted trade-off: matching 500 ms
+ * would delay every optimistic pin by half a second to spare the rarer slow double-click.
+ */
 export const DOUBLE_CLICK_WINDOW_MS = 300
 
 export interface SingleClickDetector<T> {

@@ -79,7 +79,7 @@ test('FR-3: with no chatroom selected, the panel says how to start a chat', asyn
   await panel.click({ trial: true, timeout: 5_000 })
 })
 
-test('shows the panel top-right, and as a bottom sheet below 640 px', async ({ page }) => {
+test('FR-3: shows the panel top-right, and as a bottom sheet below 640 px', async ({ page }) => {
   await page.goto('/')
   const panel = page.getByRole('complementary', { name: 'Chat' })
   await expect(panel).toBeVisible()

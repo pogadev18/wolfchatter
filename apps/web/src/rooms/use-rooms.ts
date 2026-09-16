@@ -12,7 +12,13 @@ export function useRooms() {
 }
 
 export interface CreateRoomOptions {
-  /** Runs for every create that fails for good, after its retries. */
+  /**
+   * Runs for every create that fails for good, after its retries — not only the permanently
+   * rejected ones the plan's Decision 8 describes. A create killed by a network outage also
+   * loses its pin and reads "The server could not be reached.", which is the honest outcome:
+   * nothing was stored, so a pin that stayed would be a lie. Sends differ, because their text
+   * is the user's to keep: `useSendMessage` leaves those in place with a **Retry** button.
+   */
   onError(error: Error, input: CreateRoomInput): void
 }
 
