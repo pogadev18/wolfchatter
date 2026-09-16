@@ -1,9 +1,9 @@
 import { describe, expect, it } from 'vitest'
 import { AppErrorBoundary, boundaryMessage } from './app-error-boundary.tsx'
 
-// Rendering the boundary needs jsdom and a component-testing library, which this repository
-// deliberately does not have (UI behaviour is covered by Playwright instead). What is genuinely
-// testable without a DOM is the static lifecycle method and the pure message helper below.
+// The boundary's rendered fallback is tested end to end, against the production build, in
+// e2e/devlog.spec.ts, which makes the lazy devlog chunk fail to load. What these unit tests pin
+// without a DOM is the static lifecycle method and the pure message helper below.
 describe('AppErrorBoundary.getDerivedStateFromError', () => {
   it('turns a thrown Error into crashed state carrying that error', () => {
     const error = new Error('boom')

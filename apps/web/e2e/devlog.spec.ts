@@ -105,6 +105,30 @@ test('FR-8: a related link moves the reader to that entry', async ({ page }) => 
   await expect(target).toBeInViewport()
 })
 
+test('a devlog chunk that fails to load shows the error screen, and Reload recovers', async ({
+  page,
+}) => {
+  // The likeliest real crash: after a deploy, an open tab asks for the previous build's chunk,
+  // which is gone. `_redirects` answers with index.html, and the dynamic import fails, as here.
+  await page.route('**/assets/devlog-page-*.js', (route) => route.abort())
+
+  await page.goto('/devlog')
+
+  const fallback = page.getByRole('alert')
+  const reload = fallback.getByRole('button', { name: 'Reload' })
+  await expect(
+    fallback.getByText(
+      "Something went wrong and this page can't recover from it. Reloading usually fixes it.",
+      { exact: true },
+    ),
+  ).toBeVisible()
+  await expect(reload).toBeVisible()
+
+  await page.unroute('**/assets/devlog-page-*.js')
+  await reload.click()
+  await expect(page.getByRole('heading', { name: 'Devlog', level: 1 })).toBeVisible()
+})
+
 test('FR-8: opens no WebSocket', async ({ page }) => {
   const sockets: string[] = []
   page.on('websocket', (socket) => sockets.push(socket.url()))
