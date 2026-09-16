@@ -69,4 +69,36 @@ describe('parseEnv', () => {
       /Invalid environment variables:\n.*DATABASE_URL must be a postgres:\/\/ URL[\s\S]*PORT/,
     )
   })
+
+  describe('DATABASE_URL TLS', () => {
+    it('accepts a loopback IPv4 host with no sslmode', () => {
+      expect(() =>
+        parseEnv({ DATABASE_URL: 'postgres://wolfchatter:wolfchatter@127.0.0.1:5433/wolfchatter' }),
+      ).not.toThrow()
+    })
+
+    it('accepts the IPv6 loopback address with no sslmode', () => {
+      expect(() =>
+        parseEnv({ DATABASE_URL: 'postgres://wolfchatter:wolfchatter@[::1]:5433/wolfchatter' }),
+      ).not.toThrow()
+    })
+
+    it('accepts the literal name localhost with no sslmode', () => {
+      expect(() => parseEnv({ DATABASE_URL })).not.toThrow()
+    })
+
+    it('rejects a hosted host with no sslmode, naming the fix', () => {
+      expect(() =>
+        parseEnv({ DATABASE_URL: 'postgres://user:pass@ep-cool-1234.aws.neon.tech/db' }),
+      ).toThrow(/DATABASE_URL must set sslmode=verify-full/)
+    })
+
+    it('accepts a hosted host with sslmode=verify-full', () => {
+      expect(() =>
+        parseEnv({
+          DATABASE_URL: 'postgres://user:pass@ep-cool-1234.aws.neon.tech/db?sslmode=verify-full',
+        }),
+      ).not.toThrow()
+    })
+  })
 })
