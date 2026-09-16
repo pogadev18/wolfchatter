@@ -156,8 +156,10 @@ dependency bump downgrading production TLS with no error and no failing test.
 
 ## The deploy pipeline
 
-`.github/workflows/deploy.yml` runs after CI succeeds on `main` (`workflow_run`), or on demand
-(`workflow_dispatch`). Its steps, in order, and why each is where it is:
+`.github/workflows/deploy.yml` runs after CI succeeds on a push to `main` (`workflow_run`), or on
+demand (`workflow_dispatch`). Its ordering rule: every step that cannot change production runs
+before the first step that can, so a failure in one of them leaves production exactly as it was.
+Its steps, in order, and why each is where it is:
 
 1. **Resolve the commit to deploy** — `github.event.workflow_run.head_sha`, falling back to
    `github.sha` only for a manual `workflow_dispatch` run, which has no `workflow_run` event to
@@ -165,20 +167,27 @@ dependency bump downgrading production TLS with no error and no failing test.
 2. **Check out that commit with full history** (`fetch-depth: 0`) — the web build resolves each
    work-log entry's commit from `git log` (`apps/web/plugins/worklog.ts`), and a shallow clone
    would silently ship a devlog with no commit links.
-3. **Migrate the database** — against Neon's direct connection, before anything else changes.
-   This runs while the *previous* commit's API is still serving live traffic, which is what forces
-   the backward-compatibility rule below.
-4. **Trigger the Render deploy hook** — a `POST`; a `2xx` only proves Render *accepted* the
+3. **Build the web app** — `VITE_API_URL` is baked into the bundle at build time from the
+   `API_ORIGIN` variable. Built now, not after the API deploy, so a build failure changes nothing.
+4. **Resolve the Netlify CLI** — the publish step's exact `pnpm dlx` command with `--version` in
+   place of `deploy`, and no secrets in its environment, because this is where the CLI's install
+   scripts run. `pnpm dlx` has no lockfile and resolves the CLI's whole dependency tree on every
+   run, so this surfaces a resolution or install failure before production changes; the publish
+   step then reuses the install from pnpm's dlx cache. It cannot catch a mistake in `deploy`'s own
+   arguments: `--version` never reads `--dir`, which is how the defect under "Traps" below got as
+   far as it did.
+5. **Migrate the database** — against Neon's direct connection, the first step that changes
+   production. This runs while the *previous* commit's API is still serving live traffic, which is
+   what forces the backward-compatibility rule below.
+6. **Trigger the Render deploy hook** — a `POST`; a `2xx` only proves Render *accepted* the
    request, not that anything shipped.
-5. **Wait for `/api/health` to report the new commit** — the only real evidence a deploy
+7. **Wait for `/api/health` to report the new commit** — the only real evidence a deploy
    happened. It requires both `ok: true` and the matching commit; a `503` or a stale commit both
    keep it polling, up to a 10-minute timeout that fails naming both the expected commit and the
    last one it saw. (The job's own 20-minute timeout sits above that on purpose, so a hang
    anywhere earlier — checkout, install, the migration itself — still produces a specific timeout
    instead of a generic one.)
-6. **Build the web app** — `VITE_API_URL` is baked into the bundle at build time from the
-   `API_ORIGIN` variable.
-7. **Publish to Netlify** — last, because every step before it is already confirmed live. The
+8. **Publish to Netlify** — last, because by then the API it will talk to is confirmed live. The
    rehearsal below found that "last" still wasn't safe enough on its own.
 
 ### Traps this workflow has already hit
@@ -223,8 +232,9 @@ dependency bump downgrading production TLS with no error and no failing test.
   `workflow_run.branches: [main]` filters on `head_branch` — which, for a fork's own pull-request
   run, is a branch name *inside the fork*. A fork branch named `main` would satisfy that filter
   alone. The guard also checks
-  `github.event.workflow_run.head_repository.full_name == github.repository`, so only a
-  `workflow_run` from this repository's own `main` can start the job.
+  `github.event.workflow_run.head_repository.full_name == github.repository`, and
+  `github.event.workflow_run.event == 'push'`, so only a CI run that a push to this repository's
+  own `main` started can start the job.
 
 ### Migrations run before the API deploys
 

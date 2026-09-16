@@ -26,9 +26,10 @@ jobs:
     name: Migrate, deploy the API, publish the web app
     runs-on: ubuntu-latest
     # wait-for-health.ts alone can legitimately run for its own 10-minute default; the rest of
-    # the job (checkout, install, migrate, build, publish) is minutes, not seconds, on top of
-    # that. This must stay comfortably above wait-for-health's timeout, so a slow deploy fails
-    # with *its* descriptive error naming both commits, not a generic "job timed out".
+    # the job (checkout, install, build, CLI warm-up, migrate, publish) is minutes, not seconds,
+    # on top of that. This must stay comfortably above wait-for-health's timeout, so a slow
+    # deploy fails with *its* descriptive error naming both commits, not a generic "job timed
+    # out".
     timeout-minutes: 20
     # A failed or cancelled CI run must never deploy. workflow_dispatch has no CI conclusion to
     # check at all — a human triggering this manually (which needs write access to this
@@ -42,9 +43,13 @@ jobs:
     # to start this job — with DATABASE_URL, RENDER_DEPLOY_HOOK_URL and NETLIFY_AUTH_TOKEN
     # already in its environment — before the checkout step even gets a chance to fail on a
     # fork's SHA.
+    #
+    # And only a CI run that a push started deploys; a pull_request run never does, whatever
+    # branch it reports.
     if: >-
       github.event_name == 'workflow_dispatch' ||
       (github.event.workflow_run.conclusion == 'success' &&
+      github.event.workflow_run.event == 'push' &&
       github.event.workflow_run.head_repository.full_name == github.repository)
     steps:
       - name: Resolve the commit to deploy
@@ -83,6 +88,31 @@ jobs:
 
       - run: pnpm install --frozen-lockfile
 
+      # Every step that cannot change production runs before the first step that can, the
+      # migration. A build that fails, or a Netlify CLI that will not resolve, then stops the
+      # deploy with production exactly as it was, rather than after the database has migrated and
+      # the API has deployed, leaving the new API live behind the old web app.
+      - name: Build the web app
+        env:
+          VITE_API_URL: ${{ vars.API_ORIGIN }}
+        run: pnpm --filter @wolfchatter/web build
+
+      - name: Resolve the Netlify CLI before anything changes
+        # The publish step's `pnpm dlx` has no lockfile: it resolves netlify-cli@27.7.0's whole
+        # dependency tree afresh, so a resolution or install failure can happen on any run. This
+        # runs the identical dlx command with a harmless `--version`, so that failure surfaces
+        # here instead of after the migration. pnpm keeps the install in its dlx cache, keyed on
+        # the package and the dlx flags rather than the arguments after `netlify` (observed with
+        # pnpm 12.4.1: `--version` then `--help` with the same flags installed once), so the
+        # publish step reuses this exact tree. Keep the two commands' flags identical.
+        #
+        # No `env:` here, deliberately: this is where netlify-cli's allowed install scripts run
+        # (esbuild, sharp, unix-dgram), and they must never see NETLIFY_AUTH_TOKEN.
+        working-directory: apps/web
+        run: >-
+          pnpm dlx --allow-build=esbuild --allow-build=sharp --allow-build=unix-dgram
+          --package=netlify-cli@27.7.0 netlify --version
+
       - name: Migrate the database
         # This runs before the Render deploy hook below, against the database the *previous*
         # commit's API is still serving live traffic from — a free-tier build plus boot takes
@@ -109,12 +139,10 @@ jobs:
           SHA: ${{ steps.resolve-sha.outputs.sha }}
         run: node apps/api/src/deploy/wait-for-health.ts --url "$API_ORIGIN/api/health" --commit "$SHA"
 
-      - name: Build the web app
-        env:
-          VITE_API_URL: ${{ vars.API_ORIGIN }}
-        run: pnpm --filter @wolfchatter/web build
-
       - name: Publish the web app to Netlify
+        # The command must match the warm-up step's flags exactly, so it reuses the tree that step
+        # already resolved and installed before the migration.
+        #
         # working-directory: apps/web is what avoids a separate problem: this is a 4-package
         # pnpm workspace, and run from the root the Netlify CLI's own workspace detection asks
         # an interactive "which package is this?" question. There is no TTY to answer it in
@@ -137,8 +165,8 @@ jobs:
         #
         # `--allow-build` lists the packages pnpm 12 would otherwise refuse to run install
         # scripts for (ERR_PNPM_IGNORED_BUILDS) — the same rule this repository's own
-        # pnpm-workspace.yaml `allowBuilds` exists for, except `dlx` runs in its own throwaway
-        # store and never reads that file. None of the three are needed for `deploy --prod
+        # pnpm-workspace.yaml `allowBuilds` exists for, except `dlx` installs outside this
+        # workspace and never reads that file. None of the three are needed for `deploy --prod
         # --no-build`: esbuild bundles edge functions, sharp transforms images on the CDN, and
         # unix-dgram reports statsd metrics.
         working-directory: apps/web

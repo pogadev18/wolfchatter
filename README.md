@@ -54,7 +54,7 @@ Clients generate the ids, so retrying a write returns the stored item instead of
 
 ## Deployment
 
-`main` deploys itself. On green CI, [`.github/workflows/deploy.yml`](.github/workflows/deploy.yml) migrates the Neon database, triggers a Render deploy, waits for `/api/health` to report the new commit, builds the web app, and publishes it to Netlify — in that order, so nothing is published until the API it will talk to is confirmed live. See [`docs/INFRASTRUCTURE.md`](docs/INFRASTRUCTURE.md) for the full pipeline, every environment variable and why, free-tier limits, and what staging and multi-instance scaling would take (both are designed, not built).
+`main` deploys itself. On green CI, [`.github/workflows/deploy.yml`](.github/workflows/deploy.yml) builds the web app and resolves the Netlify CLI, then migrates the Neon database, triggers a Render deploy, waits for `/api/health` to report the new commit, and publishes the web app to Netlify — in that order, so the steps that cannot change production run before any that can, and nothing is published until the API it will talk to is confirmed live. See [`docs/INFRASTRUCTURE.md`](docs/INFRASTRUCTURE.md) for the full pipeline, every environment variable and why, free-tier limits, and what staging and multi-instance scaling would take (both are designed, not built).
 
 ## The devlog
 
