@@ -12,10 +12,13 @@
     "typecheck": "tsc --noEmit -p tsconfig.json && tsc --noEmit -p tsconfig.node.json"
   },
   "dependencies": {
+    "@tanstack/react-query": "5.102.8",
+    "@wolfchatter/shared": "workspace:*",
     "leaflet": "1.9.4",
     "react": "19.3.0",
     "react-dom": "19.3.0",
     "react-leaflet": "5.0.0",
+    "react-router": "8.3.1",
     "zod": "4.6.5"
   },
   "devDependencies": {
