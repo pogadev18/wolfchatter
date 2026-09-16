@@ -166,6 +166,33 @@ test('FR-5: the message list is in the tab order, so a keyboard can scroll its h
   await expect.poll(() => list.evaluate((element) => element.scrollTop)).toBeGreaterThan(0)
 })
 
+test('FR-5: keeps a reader’s scroll position when a message arrives while they have scrolled up', async ({
+  page,
+  browser,
+  database,
+}) => {
+  const room = await database.createRoom(CLUJ)
+  const other = await openAnotherBrowser(browser)
+  await other.goto(`/?room=${room.id}`)
+  await page.goto(`/?room=${room.id}`)
+  // Long enough that the list overflows and really scrolls, as in the tab-order test above.
+  await sendMessage(page, 'ana', 'long '.repeat(200))
+  const list = page.getByRole('list', { name: 'Messages' })
+  await expect
+    .poll(() => list.evaluate((element) => element.scrollHeight > element.clientHeight))
+    .toBe(true)
+  await list.evaluate((element) => {
+    element.scrollTop = 0
+  })
+
+  // Arrives as a push (`other` joined before this send), while `page` is reading history.
+  await sendMessage(other, 'ion', 'arrived while scrolled up')
+
+  await expect(messageWith(page, 'arrived while scrolled up')).toBeVisible()
+  expect(await list.evaluate((element) => element.scrollTop)).toBe(0)
+  await other.context().close()
+})
+
 test('FR-5: a message the API rejects is removed with the reason, and never retried', async ({
   page,
   database,
