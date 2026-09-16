@@ -1,5 +1,19 @@
 import type { Page } from '@playwright/test'
 
+/** The chat panel: `<aside aria-label="Chat">`, reachable as a `complementary` region by that name. */
+export function chatPanel(page: Page) {
+  return page.getByRole('complementary', { name: 'Chat' })
+}
+
+/**
+ * The panel's connection-status line: "Connecting…", "Waking up the server…", "Connected" or
+ * "Reconnecting…". Scoped to the panel because the map has its own `role="status"` line for a
+ * chatroom list that failed to load.
+ */
+export function connectionStatus(page: Page) {
+  return chatPanel(page).getByRole('status')
+}
+
 /** The message input. Labels match loosely by default, and "Messages" also labels the list. */
 export function messageInput(page: Page) {
   return page.getByLabel('Message', { exact: true })

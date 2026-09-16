@@ -1,4 +1,4 @@
-import { messageWith, sendMessage } from './chat.ts'
+import { connectionStatus, messageWith, sendMessage } from './chat.ts'
 import { expect, openAnotherBrowser, test } from './fixtures.ts'
 import { mapPoint, pinNamed } from './map.ts'
 
@@ -16,7 +16,7 @@ test('FR-7: a pin created in one browser appears in another, which keeps its own
   const room = await database.createRoom(CLUJ)
   const other = await openAnotherBrowser(browser)
   await other.goto(`/?room=${room.id}`)
-  await expect(other.getByRole('status')).toHaveText('Connected')
+  await expect(connectionStatus(other)).toHaveText('Connected')
   await page.goto('/')
 
   const first = await mapPoint(page, { x: -200, y: 100 })
@@ -66,13 +66,13 @@ test('FR-7: after a dropped connection, recovers what it missed and receives liv
   await expect(messageWith(other, 'before the drop')).toBeVisible()
 
   await other.context().setOffline(true)
-  await expect(other.getByRole('status')).toHaveText('Reconnecting…')
+  await expect(connectionStatus(other)).toHaveText('Reconnecting…')
   await sendMessage(page, 'ana', 'while you were away')
   await expect(messageWith(page, 'while you were away').locator('time')).toBeVisible()
   await database.createRoom(ROME)
   await other.context().setOffline(false)
 
-  await expect(other.getByRole('status')).toHaveText('Connected', { timeout: RECONNECT_TIMEOUT_MS })
+  await expect(connectionStatus(other)).toHaveText('Connected', { timeout: RECONNECT_TIMEOUT_MS })
   await expect(messageWith(other, 'while you were away')).toBeVisible()
   await expect(pinNamed(other, 'Chatroom 2')).toBeVisible()
   // Recovered by a refetch; this one only arrives if the chatroom was joined again.
@@ -91,7 +91,7 @@ test('shows "Waking up the server…" while the first connection takes long, the
     socket.connectToServer()
   })
   await page.goto('/')
-  const status = page.getByRole('status')
+  const status = connectionStatus(page)
 
   await expect(status).toHaveText('Connecting…')
   await expect(status).toHaveText('Waking up the server…')
@@ -108,5 +108,5 @@ test('sends messages while the socket cannot connect', async ({ page, database }
   await sendMessage(page, 'ana', 'no socket needed')
 
   await expect(messageWith(page, 'no socket needed').locator('time')).toBeVisible()
-  await expect(page.getByRole('status')).not.toHaveText('Connected')
+  await expect(connectionStatus(page)).not.toHaveText('Connected')
 })
