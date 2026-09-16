@@ -6,7 +6,7 @@ import {
   waitForHealth,
 } from './wait-for-health.ts'
 
-const URL = 'https://wolfchatter-api.onrender.com/api/health'
+const HEALTH_URL = 'https://wolfchatter-api.onrender.com/api/health'
 const EXPECTED_COMMIT = 'abc1234'
 
 function healthResponse(body: unknown, status = 200): Response {
@@ -39,9 +39,12 @@ describe('waitForHealth', () => {
       .mockResolvedValue(healthResponse({ ok: true, db: 'up', commit: EXPECTED_COMMIT }))
 
     await expect(
-      waitForHealth({ url: URL, expectedCommit: EXPECTED_COMMIT }, { fetch, ...fakeClock() }),
+      waitForHealth(
+        { url: HEALTH_URL, expectedCommit: EXPECTED_COMMIT },
+        { fetch, ...fakeClock() },
+      ),
     ).resolves.toBeUndefined()
-    expect(fetch).toHaveBeenCalledExactlyOnceWith(URL)
+    expect(fetch).toHaveBeenCalledExactlyOnceWith(HEALTH_URL)
   })
 
   it('keeps polling while a different commit — the old instance — is still serving', async () => {
@@ -52,7 +55,7 @@ describe('waitForHealth', () => {
       .mockResolvedValueOnce(healthResponse({ ok: true, db: 'up', commit: EXPECTED_COMMIT }))
 
     await waitForHealth(
-      { url: URL, expectedCommit: EXPECTED_COMMIT, pollIntervalMs: 1_000 },
+      { url: HEALTH_URL, expectedCommit: EXPECTED_COMMIT, pollIntervalMs: 1_000 },
       { fetch, ...fakeClock() },
     )
 
@@ -66,7 +69,7 @@ describe('waitForHealth', () => {
       .mockResolvedValueOnce(healthResponse({ ok: true, db: 'up', commit: EXPECTED_COMMIT }))
 
     await waitForHealth(
-      { url: URL, expectedCommit: EXPECTED_COMMIT, pollIntervalMs: 1_000 },
+      { url: HEALTH_URL, expectedCommit: EXPECTED_COMMIT, pollIntervalMs: 1_000 },
       { fetch, ...fakeClock() },
     )
 
@@ -80,7 +83,7 @@ describe('waitForHealth', () => {
       .mockResolvedValueOnce(healthResponse({ ok: true, db: 'up', commit: EXPECTED_COMMIT }))
 
     await waitForHealth(
-      { url: URL, expectedCommit: EXPECTED_COMMIT, pollIntervalMs: 1_000 },
+      { url: HEALTH_URL, expectedCommit: EXPECTED_COMMIT, pollIntervalMs: 1_000 },
       { fetch, ...fakeClock() },
     )
 
@@ -94,7 +97,7 @@ describe('waitForHealth', () => {
       .mockResolvedValueOnce(healthResponse({ ok: true, db: 'up', commit: EXPECTED_COMMIT }))
 
     await waitForHealth(
-      { url: URL, expectedCommit: EXPECTED_COMMIT, pollIntervalMs: 1_000 },
+      { url: HEALTH_URL, expectedCommit: EXPECTED_COMMIT, pollIntervalMs: 1_000 },
       { fetch, ...fakeClock() },
     )
 
@@ -109,7 +112,12 @@ describe('waitForHealth', () => {
     let error: unknown
     try {
       await waitForHealth(
-        { url: URL, expectedCommit: EXPECTED_COMMIT, timeoutMs: 5_000, pollIntervalMs: 1_000 },
+        {
+          url: HEALTH_URL,
+          expectedCommit: EXPECTED_COMMIT,
+          timeoutMs: 5_000,
+          pollIntervalMs: 1_000,
+        },
         { fetch, ...fakeClock() },
       )
     } catch (caught) {
