@@ -4,6 +4,7 @@ import { describeFailure } from '../api/client.ts'
 import { newestArrival } from './announcements.ts'
 import { MessageForm } from './message-form.tsx'
 import { MessageList } from './message-list.tsx'
+import type { OutgoingMessage } from './outbox.ts'
 import { unsentMessages } from './outbox.ts'
 import { useMessages, useOutgoingMessages, useSendMessage } from './use-messages.ts'
 
@@ -12,25 +13,39 @@ interface RoomChatProps {
   title: string
   /** The chatroom's create is still in flight. */
   creating: boolean
+  /**
+   * Reports the panel's one notice upward, as `MessageForm` reports a validation problem here.
+   * Must stay referentially stable: the mount effect below depends on it.
+   */
+  onNotice(notice: string | undefined): void
 }
 
 /** A chatroom's title, messages and form. The panel mounts one per chatroom, keyed by its id. */
-export function RoomChat({ roomId, title, creating }: RoomChatProps) {
+export function RoomChat({ roomId, title, creating, onNotice }: RoomChatProps) {
   const messages = useMessages(roomId, { enabled: !creating })
   const outgoing = useOutgoingMessages(roomId)
-  // The panel's one notice: a client-side validation problem or a permanently rejected send.
-  // A new one replaces a stale one, so at most one `role="alert"` is ever live at once.
-  const [notice, setNotice] = useState<string>()
   const { send, retry } = useSendMessage({
-    onRejected: (error) => setNotice(`Your message was not sent. ${describeFailure(error)}`),
+    onRejected: (error) => onNotice(`Your message was not sent. ${describeFailure(error)}`),
   })
   const stored = messages.data ?? []
   const announcement = useArrivalAnnouncement(messages.data)
 
+  // Mounting is a room change, because the panel keys this by chatroom id. That covers the paths
+  // that change the selection without going through the panel: Back, Forward and the opening URL.
+  useEffect(() => {
+    onNotice(undefined)
+  }, [onNotice])
+
   function handleSend(input: CreateMessageInput) {
-    setNotice(undefined)
+    onNotice(undefined)
     announcement.sentByMe(input.id)
     send({ roomId, input })
+  }
+
+  /** Retrying is the user acting on the notice, so the notice goes with the attempt. */
+  function handleRetry(message: OutgoingMessage) {
+    onNotice(undefined)
+    retry(message)
   }
 
   return (
@@ -39,13 +54,12 @@ export function RoomChat({ roomId, title, creating }: RoomChatProps) {
       {messages.isError && (
         <p className="text-center text-red-700 text-sm">The messages could not be loaded.</p>
       )}
-      <MessageList messages={stored} unsent={unsentMessages(outgoing, stored)} onRetry={retry} />
-      <MessageForm disabled={creating} onSend={handleSend} onProblem={setNotice} />
-      {notice && (
-        <p role="alert" className="text-center text-red-700 text-sm">
-          {notice}
-        </p>
-      )}
+      <MessageList
+        messages={stored}
+        unsent={unsentMessages(outgoing, stored)}
+        onRetry={handleRetry}
+      />
+      <MessageForm disabled={creating} onSend={handleSend} onProblem={onNotice} />
       <p aria-live="polite" className="sr-only">
         {announcement.text}
       </p>

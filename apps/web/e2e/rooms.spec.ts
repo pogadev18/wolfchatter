@@ -1,4 +1,5 @@
 import { createRoomInputSchema } from '@wolfchatter/shared'
+import { sendMessage } from './chat.ts'
 import { expect, openAnotherBrowser, test } from './fixtures.ts'
 import { mapPoint, pinNamed, pinTip, recordRoomCreates } from './map.ts'
 
@@ -36,9 +37,13 @@ test('FR-2: shows the pin before the server has answered', async ({ page }) => {
 
   await expect(pinNamed(page, 'Creating chatroom…')).toBeVisible()
   await expect(page.getByRole('heading', { name: 'Creating chatroom…' })).toBeVisible()
+  // The server has nowhere to store a message until the chatroom exists.
+  const submit = page.getByRole('button', { name: 'Submit' })
+  await expect(submit).toBeDisabled()
   letAnswer()
   await expect(page.getByRole('heading', { name: 'Chatroom 1' })).toBeVisible()
   await expect(pinNamed(page, 'Creating chatroom…')).toHaveCount(0)
+  await expect(submit).toBeEnabled()
 })
 
 test('FR-2: a double-click zooms in without creating a chatroom', async ({ page }) => {
@@ -225,6 +230,59 @@ test('FR-4: says so when the chatroom list cannot be loaded, instead of loading 
   const panel = page.getByRole('complementary', { name: 'Chat' })
   await expect(panel.getByText('The chatrooms could not be loaded')).toBeVisible()
   await expect(panel).not.toContainText('Loading chatroom…')
+})
+
+test('FR-2, FR-4: going back to a chatroom clears the notice a failed create left behind', async ({
+  page,
+  database,
+}) => {
+  const room = await database.createRoom(CLUJ)
+  await page.route('**/api/rooms', (route) =>
+    route.request().method() === 'POST'
+      ? route.fulfill({
+          status: 409,
+          json: {
+            error: {
+              code: 'CONFLICT',
+              message: 'This chatroom id is already used by another chatroom',
+            },
+          },
+        })
+      : route.continue(),
+  )
+  await page.route('**/api/rooms/*/messages', (route) =>
+    route.request().method() === 'POST'
+      ? route.fulfill({
+          status: 409,
+          json: {
+            error: {
+              code: 'CONFLICT',
+              message: 'This message id is already used by another message',
+            },
+          },
+        })
+      : route.continue(),
+  )
+  await page.goto(`/?room=${room.id}`)
+  const panel = page.getByRole('complementary', { name: 'Chat' })
+  await expect(panel.getByRole('heading', { name: 'Chatroom 1' })).toBeVisible()
+
+  const click = await mapPoint(page, { x: -200, y: 100 })
+  await page.mouse.click(click.x, click.y)
+  await expect(panel.getByRole('alert')).toHaveText(
+    "Couldn't create the chatroom. This chatroom id is already used by another chatroom.",
+  )
+  await expect(page).toHaveURL(/\/$/)
+
+  await page.goBack()
+
+  await expect(panel.getByRole('heading', { name: 'Chatroom 1' })).toBeVisible()
+  await expect(panel.getByRole('alert')).toHaveCount(0)
+  // The strict singular locator: a second live region here would fail the assertion, not pass it.
+  await sendMessage(page, 'ana', 'hello')
+  await expect(panel.getByRole('alert')).toHaveText(
+    'Your message was not sent. This message id is already used by another message.',
+  )
 })
 
 test('FR-6: chatrooms survive a reload and a new session', async ({ page, browser }) => {

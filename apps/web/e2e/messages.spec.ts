@@ -111,6 +111,34 @@ test('FR-5: a failed send stays visible, and Retry sends the same message again'
   expect(new Set(sends.map((body) => JSON.stringify(body))).size).toBe(1)
 })
 
+test('FR-5: Retry clears the notice that was standing when it was clicked', async ({
+  page,
+  database,
+}) => {
+  const room = await database.createRoom(CLUJ)
+  let networkDown = true
+  await page.route('**/api/rooms/*/messages', (route) =>
+    route.request().method() === 'POST' && networkDown
+      ? route.abort('connectionreset')
+      : route.continue(),
+  )
+  await page.goto(`/?room=${room.id}`)
+  const panel = page.getByRole('complementary', { name: 'Chat' })
+
+  await sendMessage(page, 'ana', 'hello')
+  const message = messageWith(page, 'hello')
+  // Two automatic retries come first, a second and then two seconds apart.
+  await expect(message).toContainText('Not sent', { timeout: 10_000 })
+  await sendMessage(page, '', 'never sent')
+  await expect(panel.getByRole('alert')).toHaveText('Enter a user name')
+
+  networkDown = false
+  await message.getByRole('button', { name: 'Retry' }).click()
+
+  await expect(message.locator('time')).toBeVisible()
+  await expect(panel.getByRole('alert')).toHaveCount(0)
+})
+
 test('FR-5: a message the API rejects is removed with the reason, and never retried', async ({
   page,
   database,

@@ -21,6 +21,8 @@ export function App() {
   const { selection, selectRoom, deselectRoom } = useRoomSelection()
   const selectedRoomId = selection.kind === 'room' ? selection.roomId : undefined
   useRealtime(selectedRoomId)
+  // The panel's one notice, wherever it came from. `setNotice` is stable, which is what lets
+  // `RoomChat` clear it once per chatroom it opens instead of on every render.
   const [notice, setNotice] = useState<string>()
   const createRoom = useCreateRoom({
     onError: (error, input) => {
@@ -61,7 +63,11 @@ export function App() {
           </p>
         )}
       </main>
-      <ChatPanel view={panelView(selection, rooms.data, creating, rooms.isError)} notice={notice} />
+      <ChatPanel
+        view={panelView(selection, rooms.data, creating, rooms.isError)}
+        notice={notice}
+        onNotice={setNotice}
+      />
     </div>
   )
 }

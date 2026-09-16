@@ -10,10 +10,12 @@ interface ChatPanelProps {
   view: PanelView
   /** Why the last action failed, such as a chatroom that could not be created. */
   notice: string | undefined
+  /** Set by the chat as well, so the whole panel has one notice and one `role="alert"`. */
+  onNotice(notice: string | undefined): void
 }
 
 /** The chat panel from the mockup: top-right on wide screens, a bottom sheet below 640 px. */
-export function ChatPanel({ view, notice }: ChatPanelProps) {
+export function ChatPanel({ view, notice, onNotice }: ChatPanelProps) {
   const status = useConnectionStatusText()
 
   return (
@@ -21,7 +23,7 @@ export function ChatPanel({ view, notice }: ChatPanelProps) {
       aria-label="Chat"
       className="flex max-h-[50dvh] flex-col gap-3 border-stone-300 border-t bg-white p-4 shadow-lg sm:absolute sm:top-4 sm:right-4 sm:max-h-[calc(100dvh-5rem)] sm:w-96 sm:rounded-lg sm:border"
     >
-      <PanelContent view={view} />
+      <PanelContent view={view} onNotice={onNotice} />
       {notice && (
         <p role="alert" className="text-center text-red-700 text-sm">
           {notice}
@@ -34,7 +36,7 @@ export function ChatPanel({ view, notice }: ChatPanelProps) {
   )
 }
 
-function PanelContent({ view }: { view: PanelView }) {
+function PanelContent({ view, onNotice }: Omit<ChatPanelProps, 'notice'>) {
   switch (view.kind) {
     case 'empty':
       return <p className="text-center text-stone-700">Click on the map to start a chat</p>
@@ -45,7 +47,15 @@ function PanelContent({ view }: { view: PanelView }) {
     case 'not-found':
       return <p className="text-center text-stone-700">Chatroom not found</p>
     case 'creating':
-      return <RoomChat key={view.roomId} roomId={view.roomId} title="Creating chatroom…" creating />
+      return (
+        <RoomChat
+          key={view.roomId}
+          roomId={view.roomId}
+          title="Creating chatroom…"
+          creating
+          onNotice={onNotice}
+        />
+      )
     case 'room':
       return (
         <RoomChat
@@ -53,6 +63,7 @@ function PanelContent({ view }: { view: PanelView }) {
           roomId={view.room.id}
           title={roomTitle(view.room)}
           creating={false}
+          onNotice={onNotice}
         />
       )
   }
