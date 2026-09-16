@@ -31,8 +31,21 @@ jobs:
     # with *its* descriptive error naming both commits, not a generic "job timed out".
     timeout-minutes: 20
     # A failed or cancelled CI run must never deploy. workflow_dispatch has no CI conclusion to
-    # check at all — a human triggering this manually is its own approval.
-    if: github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success'
+    # check at all — a human triggering this manually (which needs write access to this
+    # repository already) is its own approval.
+    #
+    # The second half of the workflow_run branch guards something less obvious: this repository
+    # is public, and `workflow_run.branches: [main]` above filters on `head_branch` — which, for
+    # a fork's own pull_request CI run, is a branch name *in the fork*. A fork can name a branch
+    # `main` too, and that alone would satisfy the filter. Without also pinning
+    # `head_repository.full_name` to this repository, that fork's CI run passing would be enough
+    # to start this job — with DATABASE_URL, RENDER_DEPLOY_HOOK_URL and NETLIFY_AUTH_TOKEN
+    # already in its environment — before the checkout step even gets a chance to fail on a
+    # fork's SHA.
+    if: >-
+      github.event_name == 'workflow_dispatch' ||
+      (github.event.workflow_run.conclusion == 'success' &&
+      github.event.workflow_run.head_repository.full_name == github.repository)
     steps:
       - name: Resolve the commit to deploy
         id: resolve-sha
