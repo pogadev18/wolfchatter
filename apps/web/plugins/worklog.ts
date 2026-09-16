@@ -2,7 +2,12 @@ import { execFileSync } from 'node:child_process'
 import { readdirSync, readFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { buildDevlogEntries, parseAddedCommits, type WorklogFile } from '@wolfchatter/worklog'
+import {
+  buildDevlogEntries,
+  isShallowRepository,
+  parseAddedCommits,
+  type WorklogFile,
+} from '@wolfchatter/worklog'
 import { marked } from 'marked'
 import type { Plugin } from 'vite'
 
@@ -28,6 +33,20 @@ function readWorklogFiles(): WorklogFile[] {
  */
 function readAddedCommits(): ReadonlyMap<string, string> {
   try {
+    // Checked before the log walk below, not after: a shallow clone's boundary commit has no
+    // parent, so `git log --diff-filter=A` would otherwise treat it as having added every
+    // work-log file and confidently attribute them all to that one commit — wrong, not missing.
+    const shallow = execFileSync('git', ['rev-parse', '--is-shallow-repository'], {
+      cwd: REPO_ROOT,
+      encoding: 'utf8',
+    })
+    if (isShallowRepository(shallow)) {
+      console.warn(
+        '[wolfchatter:worklog] shallow git history for worklog/; every commit will be null',
+      )
+      return new Map()
+    }
+
     const gitLog = execFileSync(
       'git',
       ['log', '--diff-filter=A', '--format=%H', '--name-only', '--reverse', '--', 'worklog'],

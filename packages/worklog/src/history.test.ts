@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { parseAddedCommits } from './history.ts'
+import { isShallowRepository, parseAddedCommits } from './history.ts'
 
 const SHA_1 = '1111111111111111111111111111111111111111'
 const SHA_2 = '2222222222222222222222222222222222222222'
@@ -50,5 +50,19 @@ describe('parseAddedCommits', () => {
     ])
 
     expect(parseAddedCommits(gitLog)).toEqual(new Map([['2026-09-15T0905-real-entry.md', SHA_1]]))
+  })
+})
+
+describe('isShallowRepository', () => {
+  it('FR-8: is true for `git rev-parse --is-shallow-repository`’s shallow output', () => {
+    expect(isShallowRepository('true\n')).toBe(true)
+  })
+
+  it('is false for its full-history output', () => {
+    expect(isShallowRepository('false\n')).toBe(false)
+  })
+
+  it('tolerates output with no trailing newline', () => {
+    expect(isShallowRepository('true')).toBe(true)
   })
 })

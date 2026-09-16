@@ -67,15 +67,24 @@ test('FR-8: an unknown filter value in the URL is ignored rather than emptying t
   await expect(page.getByRole('listitem').first()).toBeVisible()
 })
 
-test('FR-8: at least one entry shows a link to its commit', async ({ page }) => {
-  await page.goto('/devlog')
+test('FR-8: entries show links to at least two different commits', async ({ page }) => {
+  await openDevlog(page)
 
-  // This is what makes ci.yml's `fetch-depth: 0` on the e2e job a real check: with the default
-  // shallow clone, every entry's `commit` comes back null and no such link would ever render.
-  const commitLink = page.getByRole('link', { name: /^View commit [0-9a-f]{7}$/ }).first()
-  await expect(commitLink).toBeVisible()
-  const href = await commitLink.getAttribute('href')
-  expect(href).toMatch(/^https:\/\/github\.com\/pogadev18\/wolfchatter\/commit\/[0-9a-f]{7,40}$/)
+  // Two *distinct* SHAs, not just "a commit link exists": on a shallow clone, git's boundary
+  // commit has no parent, so a naive `git log --diff-filter=A` walk treats it as having added
+  // every work-log file and attributes them all to that one commit — a link would still render,
+  // just a wrong one repeated on every entry. Only real history (fetch-depth: 0) can produce more
+  // than one distinct commit here; a shallow clone now renders no commit links at all instead.
+  const commitLinks = page.getByRole('link', { name: /^View commit [0-9a-f]{7}$/ })
+  await expect(commitLinks.first()).toBeVisible()
+  const hrefs = await commitLinks.evaluateAll((nodes) =>
+    nodes.map((node) => node.getAttribute('href')),
+  )
+  for (const href of hrefs) {
+    expect(href).toMatch(/^https:\/\/github\.com\/pogadev18\/wolfchatter\/commit\/[0-9a-f]{7,40}$/)
+  }
+  const distinctShas = new Set(hrefs.map((href) => href?.split('/commit/').at(-1)))
+  expect(distinctShas.size).toBeGreaterThanOrEqual(2)
 })
 
 test('FR-8: a related link moves the reader to that entry', async ({ page }) => {

@@ -32,3 +32,15 @@ export function parseAddedCommits(gitLog: string): Map<string, string> {
 
   return commits
 }
+
+/**
+ * Parses `git rev-parse --is-shallow-repository`'s stdout (`"true"` or `"false"`, plus a
+ * trailing newline). A shallow clone's boundary commit has no parent, so `git log
+ * --diff-filter=A` treats it as having added every file its tree can see — usually every
+ * work-log file that exists — and attributes them all to that one commit. That is confidently
+ * wrong, not merely missing: the caller must check this *before* trusting a `git log` walk, and
+ * attribute nothing at all when it is true.
+ */
+export function isShallowRepository(output: string): boolean {
+  return output.trim() === 'true'
+}
