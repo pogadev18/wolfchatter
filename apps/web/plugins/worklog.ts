@@ -40,6 +40,12 @@ function readAddedCommits(): ReadonlyMap<string, string> {
   }
 }
 
+// marked does not sanitise: any raw HTML already in the Markdown source passes straight through.
+// That is safe here only because the source is always a file under worklog/ — committed and
+// reviewed like the rest of this repository, never user- or request-supplied. The result is
+// later dropped into the page unescaped (dangerouslySetInnerHTML), so the day this function's
+// input stops being "our own contributors' committed Markdown" is the day it needs a sanitiser
+// in front of it.
 function renderBody(markdown: string): string {
   return marked.parse(markdown, { async: false })
 }
