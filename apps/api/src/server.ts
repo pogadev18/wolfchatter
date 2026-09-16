@@ -3,7 +3,7 @@
 import { buildApp } from './app.ts'
 import { connectDatabase } from './db/client.ts'
 import { parseEnv } from './env.ts'
-import { rateLimits } from './http/limits.ts'
+import { MAX_ROOMS_LISTED, rateLimits } from './http/limits.ts'
 
 const SHUTDOWN_TIMEOUT_MS = 10_000
 
@@ -20,6 +20,7 @@ const { app } = buildApp({
     rooms: env.RATE_LIMIT_ROOMS_PER_MINUTE,
     messages: env.RATE_LIMIT_MESSAGES_PER_MINUTE,
   }),
+  roomsListLimit: MAX_ROOMS_LISTED,
   logger: { level: env.LOG_LEVEL },
 })
 app.addHook('onClose', () => database.pool.end())

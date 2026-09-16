@@ -22,6 +22,8 @@ export interface AppOptions {
   trustedProxies: readonly string[]
   /** Per-client write limits; the PRD's values unless RATE_LIMIT_* raises them. */
   rateLimits: RateLimits
+  /** The most GET /api/rooms returns; the newest chatrooms when there are more. */
+  roomsListLimit: number
   logger?: FastifyServerOptions['logger']
 }
 
@@ -55,7 +57,7 @@ export function buildApp(options: AppOptions): Api {
   app.register(healthRoutes, { prefix: '/api', db: options.db, commit: options.commit })
   app.register(roomRoutes, {
     prefix: '/api',
-    rooms: createRoomsService(options.db, publisher),
+    rooms: createRoomsService(options.db, publisher, options.roomsListLimit),
     rateLimit: options.rateLimits.createRoom,
   })
   app.register(messageRoutes, {
