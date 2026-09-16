@@ -115,12 +115,20 @@ jobs:
         run: pnpm --filter @wolfchatter/web build
 
       - name: Publish the web app to Netlify
-        # apps/web, not the repository root: this is a 4-package pnpm workspace, and run from
-        # the root the Netlify CLI's own workspace detection asks an interactive "which package
-        # is this?" question. There is no TTY to answer it in Actions, so it crashes with
-        # ERR_USE_AFTER_CLOSE instead — observed on a real invocation. apps/web has no
-        # workspace of its own, so the question never comes up, and `dist` below resolves
-        # relative to it.
+        # working-directory: apps/web is what avoids a separate problem: this is a 4-package
+        # pnpm workspace, and run from the root the Netlify CLI's own workspace detection asks
+        # an interactive "which package is this?" question. There is no TTY to answer it in
+        # Actions, so it crashes with ERR_USE_AFTER_CLOSE instead — observed on a real
+        # invocation. apps/web has no workspace of its own, so the question never comes up.
+        #
+        # --dir is nonetheless given as an absolute path. Observed on a real invocation, run
+        # from apps/web exactly as this step does: the CLI resolved a relative `--dir dist`
+        # against the repository root, not this step's working directory, and failed with
+        # `The deploy directory ".../dist" has not been found.` (We observed this; we have not
+        # established why it resolves there.) $GITHUB_WORKSPACE is the repository root Actions
+        # checks this out into, so `$GITHUB_WORKSPACE/apps/web/dist` is the same directory the
+        # build step above produces — spelled out in full so it reads as correct without the
+        # reader first having to know which directory this step runs from.
         #
         # netlify-cli ships two bins, `netlify` and `ntl`, neither literally named
         # `netlify-cli` — left to guess, `pnpm dlx` can't pick one and fails with
@@ -139,4 +147,5 @@ jobs:
           NETLIFY_SITE_ID: ${{ vars.NETLIFY_SITE_ID }}
         run: >-
           pnpm dlx --allow-build=esbuild --allow-build=sharp --allow-build=unix-dgram
-          --package=netlify-cli@27.7.0 netlify deploy --prod --no-build --dir dist
+          --package=netlify-cli@27.7.0 netlify deploy --prod --no-build
+          --dir "$GITHUB_WORKSPACE/apps/web/dist"
