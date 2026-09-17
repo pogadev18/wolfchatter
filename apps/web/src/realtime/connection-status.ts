@@ -36,7 +36,7 @@ export function createConnectionStatusStore(socket: AppSocket): ConnectionStatus
 
 /**
  * The panel's status line (FR-7). A first connection that takes long means a hosting cold start,
- * which on Render's free tier takes about a minute.
+ * which on Render's free tier took 33 to 35 seconds when measured against the live API.
  */
 export function connectionStatusText(status: ConnectionStatus, slow: boolean): string {
   switch (status) {

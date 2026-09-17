@@ -66,9 +66,9 @@ export interface ApiClientOptions {
 
 /**
  * Every request's default deadline. One attempt cannot, by itself, span a full cold start: Render's
- * free tier takes about a minute to wake (PRD §7's "Risks & assumptions"; `connection-status.ts`'s
- * "Waking up the server…" text; a real cold start measured against the live API today took 33s).
- * What actually has to cover that minute is this deadline *combined with* the unchanged retry
+ * docs estimate about a minute to wake a free instance, and the live API took 33s twice, then 35s
+ * (PRD §7's "Risks & assumptions"; `connection-status.ts`'s "Waking up the server…" text).
+ * What actually has to cover that wake is this deadline *combined with* the unchanged retry
  * policy in `query-client.ts` — traced from `@tanstack/query-core`'s retryer (`failureCount < N` is
  * N retries, i.e. N+1 attempts, and `retry`/`retryDelay` are evaluated with `failureCount` *before*
  * it increments) and confirmed by timing the real library with a stubbed, slow request: a mutation
