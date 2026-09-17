@@ -1,6 +1,7 @@
 import type { CreateMessageInput, Message } from '@wolfchatter/shared'
 import { useEffect, useRef, useState } from 'react'
 import { describeFailure } from '../api/client.ts'
+import type { PanelNotice } from '../panel/notice.ts'
 import { newestArrival } from './announcements.ts'
 import { MessageForm } from './message-form.tsx'
 import { MessageList } from './message-list.tsx'
@@ -17,7 +18,7 @@ interface RoomChatProps {
    * Reports the panel's one notice upward, as `MessageForm` reports a validation problem here.
    * Must stay referentially stable: the mount effect below depends on it.
    */
-  onNotice(notice: string | undefined): void
+  onNotice(notice: PanelNotice | undefined): void
 }
 
 /** A chatroom's title, messages and form. The panel mounts one per chatroom, keyed by its id. */
@@ -25,7 +26,8 @@ export function RoomChat({ roomId, title, creating, onNotice }: RoomChatProps) {
   const messages = useMessages(roomId, { enabled: !creating })
   const outgoing = useOutgoingMessages(roomId)
   const { send, retry } = useSendMessage({
-    onRejected: (error) => onNotice(`Your message was not sent. ${describeFailure(error)}`),
+    onRejected: (error) =>
+      onNotice({ text: `Your message was not sent. ${describeFailure(error)}` }),
   })
   const stored = messages.data ?? []
   const announcement = useArrivalAnnouncement(messages.data)

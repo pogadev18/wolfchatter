@@ -1,6 +1,7 @@
 import type { Message } from '@wolfchatter/shared'
 import { type ReactNode, useEffect, useRef } from 'react'
 import type { OutgoingMessage } from './outbox.ts'
+import { shouldStickToBottom } from './stick-to-bottom.ts'
 
 /** Dates and times in the viewer's locale and time zone. */
 const dateTime = new Intl.DateTimeFormat(undefined, { dateStyle: 'short', timeStyle: 'short' })
@@ -14,12 +15,22 @@ interface MessageListProps {
 /** Stored messages, oldest first, then the user's own messages that are not stored yet. */
 export function MessageList({ messages, unsent, onRetry }: MessageListProps) {
   const listRef = useRef<HTMLOListElement>(null)
+  // Tracks the reader's position as of their last scroll, so a new message can be judged against
+  // where they were *before* it arrived. Starts true: the first message(s) should still land at
+  // the bottom, and appending never moves scrollTop on its own, so nothing else would set this.
+  const stickToBottom = useRef(true)
   const count = messages.length + unsent.length
 
-  // Keep the newest message in view.
+  function handleScroll() {
+    const list = listRef.current
+    if (list) stickToBottom.current = shouldStickToBottom(list)
+  }
+
+  // Keep the newest message in view, but only for a reader who was already there: one who has
+  // scrolled up to read history keeps their place instead (M3 review, requirement 6).
   useEffect(() => {
     const list = listRef.current
-    if (list && count > 0) list.scrollTop = list.scrollHeight
+    if (list && count > 0 && stickToBottom.current) list.scrollTop = list.scrollHeight
   }, [count])
 
   if (count === 0) {
@@ -32,6 +43,7 @@ export function MessageList({ messages, unsent, onRetry }: MessageListProps) {
   return (
     <ol
       ref={listRef}
+      onScroll={handleScroll}
       // biome-ignore lint/a11y/noNoninteractiveTabindex: a scrolling region has to be focusable
       tabIndex={0}
       aria-label="Messages"

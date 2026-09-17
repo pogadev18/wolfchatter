@@ -1,4 +1,6 @@
 export * from './create.ts'
+export * from './devlog.ts'
+export * from './history.ts'
 export * from './parse.ts'
 export * from './reminder.ts'
 export * from './schema.ts'

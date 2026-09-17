@@ -113,6 +113,42 @@ describe('proxy trust', () => {
   })
 })
 
+// The M2 review asked for IPv6 clients to be bucketed by /64. `@fastify/rate-limit`'s default
+// keyGenerator already does this (verified in the installed package's source and its own test
+// suite), so these are regression pins for behaviour `ipv6Subnet: 64` in security.ts only makes
+// explicit, not a finding fixed here. There was no RED phase: each test already passed before
+// that line was added, because the default is also 64.
+describe('IPv6 rate-limit buckets', () => {
+  const trustedProxyApp = () => startApp({ trustedProxies: ['10.0.0.0/8'] })
+
+  it('shares a bucket for two addresses inside one /64', async () => {
+    const api = trustedProxyApp()
+    await sendMany(10, () => createRoom(api, { remoteAddress: '2001:db8:abcd:12::1' }))
+
+    const response = await createRoom(api, { remoteAddress: '2001:db8:abcd:12::2' })
+
+    expect(response.statusCode).toBe(429)
+  })
+
+  it('gives an address in a different /64 its own bucket', async () => {
+    const api = trustedProxyApp()
+    await sendMany(10, () => createRoom(api, { remoteAddress: '2001:db8:abcd:12::1' }))
+
+    const response = await createRoom(api, { remoteAddress: '2001:db8:abcd:13::1' })
+
+    expect(response.statusCode).toBe(201)
+  })
+
+  it('maps an IPv4-mapped IPv6 address to the plain IPv4 bucket', async () => {
+    const api = trustedProxyApp()
+    await sendMany(10, () => createRoom(api, { remoteAddress: '198.51.100.7' }))
+
+    const response = await createRoom(api, { remoteAddress: '::ffff:198.51.100.7' })
+
+    expect(response.statusCode).toBe(429)
+  })
+})
+
 describe('CORS', () => {
   it('answers preflights from allowed origins', async () => {
     const api = startApp({ corsOrigins: [WEB_ORIGIN] })

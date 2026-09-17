@@ -1,0 +1,102 @@
+/*
+ * Hand-rolled prose styling for the work-log Markdown `marked` renders to HTML (see the safety
+ * comment on `DevlogEntry.html` in packages/worklog/src/devlog.ts for why inserting it unescaped
+ * is safe). Tailwind 4 has no @typography plugin installed, and these tags arrive as a finished
+ * HTML string we cannot add classNames to, so they are styled directly here, under one class so
+ * none of it leaks outside the devlog page. Colors are left to `currentColor`/transparency so the
+ * block inherits whatever text color its container sets.
+ */
+
+.devlog-body {
+  line-height: 1.6;
+}
+
+.devlog-body > :first-child {
+  margin-top: 0;
+}
+
+.devlog-body > :last-child {
+  margin-bottom: 0;
+}
+
+/*
+ * Body headings arrive as h4-h6 only: plugins/render-body.ts shifts them below the entry card's own
+ * h3 title in the document outline. h4 is a `##` section, the level every entry uses, and keeps
+ * the size a `##` had before the shift.
+ */
+.devlog-body h4,
+.devlog-body h5,
+.devlog-body h6 {
+  font-weight: 600;
+  margin: 1em 0 0.4em;
+}
+
+.devlog-body h4 {
+  font-size: 1.15em;
+}
+
+.devlog-body h5,
+.devlog-body h6 {
+  font-size: 1em;
+}
+
+.devlog-body p,
+.devlog-body ul,
+.devlog-body ol,
+.devlog-body blockquote,
+.devlog-body pre {
+  margin: 0.6em 0;
+}
+
+.devlog-body ul,
+.devlog-body ol {
+  padding-left: 1.4em;
+}
+
+.devlog-body ul {
+  list-style: disc;
+}
+
+.devlog-body ol {
+  list-style: decimal;
+}
+
+.devlog-body li + li {
+  margin-top: 0.2em;
+}
+
+.devlog-body a {
+  color: inherit;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.devlog-body code {
+  background: rgb(0 0 0 / 6%);
+  border-radius: 0.25em;
+  padding: 0.1em 0.35em;
+  font-size: 0.9em;
+}
+
+.devlog-body pre {
+  background: rgb(0 0 0 / 6%);
+  border-radius: 0.375em;
+  padding: 0.6em 0.8em;
+  overflow-x: auto;
+}
+
+.devlog-body pre code {
+  background: none;
+  padding: 0;
+}
+
+.devlog-body blockquote {
+  border-left: 3px solid rgb(0 0 0 / 15%);
+  padding-left: 0.8em;
+  color: rgb(0 0 0 / 65%);
+  font-style: italic;
+}
+
+.devlog-body strong {
+  font-weight: 600;
+}

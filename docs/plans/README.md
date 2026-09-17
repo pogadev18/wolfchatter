@@ -9,7 +9,7 @@ Only the current milestone has a detailed plan. The next plan is written once th
 | **M1 Foundation** | pnpm workspace and toolchain, shared API contract, work-log tooling, agent setup, CI | Contract for FR-2 to FR-7; work-log format for FR-8 | [2026-09-15-m1-foundation.md](2026-09-15-m1-foundation.md) |
 | **M2 API** | Fastify, Drizzle and Postgres: rooms and messages endpoints, validation, rate limits, Socket.IO fan-out, health check, graceful shutdown | Server side of FR-2 and FR-4 to FR-7 | [2026-09-15-m2-api.md](2026-09-15-m2-api.md) |
 | **M3 Web app** | React map with watercolor tiles, pin creation and selection, chat panel with optimistic sending, real-time updates, connection and wake-up states; Playwright tests, including two browsers chatting live | FR-1 to FR-7 | [2026-09-15-m3-web.md](2026-09-15-m3-web.md) |
-| **M4 Devlog and go-live** | `/devlog` timeline, GitHub Actions deploy to Render, Netlify and Neon, `INFRASTRUCTURE.md`, full README | FR-8, delivery | Written after M3 merges |
+| **M4 Devlog and go-live** | `/devlog` timeline, GitHub Actions deploy to Render, Netlify and Neon, `INFRASTRUCTURE.md`, full README | FR-8, delivery | [2026-09-16-m4-golive.md](2026-09-16-m4-golive.md) |
 | **M5 Self review** | Review skill, reviewer agent and checklist, run against the final code; fixes; `docs/review/REPORT.md` | All | Written after M4 merges |
 
 CI grows with the code: M1 runs lint, typecheck, unit tests and the work-log check; M2 adds integration tests against Postgres; M3 adds the build and Playwright; M4 adds the deploy workflow, which runs only after CI passes on `main`.

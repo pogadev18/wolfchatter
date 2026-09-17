@@ -4,6 +4,7 @@
   "private": true,
   "description": "Work-log entry schema, parser and CLIs behind worklog/ and the /devlog page",
   "type": "module",
+  "sideEffects": false,
   "exports": {
     ".": "./src/index.ts"
   },

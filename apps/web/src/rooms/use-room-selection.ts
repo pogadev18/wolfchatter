@@ -1,8 +1,7 @@
 import { useCallback, useEffect } from 'react'
 import { useSearchParams } from 'react-router'
+import { ROOM_PARAM, withRoomDeselected, withRoomSelected } from './room-params.ts'
 import { parseRoomParam } from './selection.ts'
-
-const ROOM_PARAM = 'room'
 
 /** The selected chatroom, kept in the URL as `?room=<id>` so a link opens the same chatroom (FR-4). */
 export function useRoomSelection() {
@@ -14,22 +13,19 @@ export function useRoomSelection() {
   // An id in capitals names the same chatroom: show the canonical, lowercase form.
   useEffect(() => {
     if (roomId !== undefined && param !== roomId) {
-      setSearchParams({ [ROOM_PARAM]: roomId }, { replace: true })
+      setSearchParams((current) => withRoomSelected(current, roomId), { replace: true })
     }
   }, [param, roomId, setSearchParams])
 
   const selectRoom = useCallback(
-    (id: string) => setSearchParams({ [ROOM_PARAM]: id }),
+    (id: string) => setSearchParams((current) => withRoomSelected(current, id)),
     [setSearchParams],
   )
 
   /** Clears the selection if it is still `id`: the user may have opened another chatroom since. */
   const deselectRoom = useCallback(
-    (id: string) => {
-      const withoutRoom = (current: URLSearchParams) =>
-        current.get(ROOM_PARAM) === id ? new URLSearchParams() : current
-      setSearchParams(withoutRoom, { replace: true })
-    },
+    (id: string) =>
+      setSearchParams((current) => withRoomDeselected(current, id), { replace: true }),
     [setSearchParams],
   )
 

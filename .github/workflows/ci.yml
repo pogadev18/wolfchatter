@@ -14,7 +14,7 @@ concurrency:
 
 jobs:
   checks:
-    name: Lint, typecheck, test, work log
+    name: Lint, typecheck, test, migrations, work log
     runs-on: ubuntu-latest
     timeout-minutes: 15
     services:
@@ -54,6 +54,52 @@ jobs:
       - name: Test
         run: pnpm test
 
+      - name: Check migrations match schema.ts
+        # drizzle.config.ts sets no dbCredentials, so `db:generate` only diffs schema.ts against
+        # the migrations already on disk — no database needed. Editing schema.ts without running
+        # `pnpm db:generate` currently reaches main unnoticed, and the deploy workflow then
+        # migrates a database to a schema the running code doesn't expect.
+        #
+        # drizzle-kit can exit 0 on failure, so the exit code alone cannot be trusted: a column
+        # rename needs its interactive "rename, or drop and add?" prompt, which has no TTY to
+        # answer here, prints "Error: Interactive prompts require a TTY terminal" — and still
+        # exits 0, generating nothing. Confirmed by hand (see the work log). Left unguarded, that
+        # renders this whole step a no-op for the one change class its own comment above calls
+        # dangerous: `apps/api/drizzle` shows no diff, so the check passes on an un-migrated
+        # rename. Guarding on the exit code AND requiring a line this project recognizes as
+        # success ("No schema changes" or "Your SQL migration file") AND rejecting any "Error:"
+        # line covers both today's known failure and a differently-worded one drizzle-kit might
+        # print later — if none of the three match, this treats the output as untrusted rather
+        # than assuming success.
+        #
+        # A genuine schema change adds a brand-new migration file, which starts out untracked —
+        # and a plain `git diff` ignores untracked files entirely, so it would miss exactly the
+        # case this check exists for. `git add -N` (intent-to-add) stages new files with no
+        # content, which is enough for the `git diff` below to treat them as an addition too,
+        # printing their full contents for whoever has to debug the failure.
+        run: |
+          set +e
+          output="$(pnpm db:generate 2>&1)"
+          status=$?
+          set -e
+          echo "$output"
+
+          if [ "$status" -ne 0 ]; then
+            echo "::error::pnpm db:generate exited $status"
+            exit 1
+          fi
+          if echo "$output" | grep -q '^Error:'; then
+            echo "::error::drizzle-kit printed an error but exited 0 — treating this as a failure"
+            exit 1
+          fi
+          if ! echo "$output" | grep -qE 'No schema changes|Your SQL migration file'; then
+            echo "::error::drizzle-kit produced no recognized success message — treating this as a failure"
+            exit 1
+          fi
+
+          git add -N apps/api/drizzle
+          git diff --exit-code -- apps/api/drizzle
+
       - name: Work log
         run: pnpm worklog:check
 
@@ -77,7 +123,12 @@ jobs:
           --health-timeout 5s
           --health-retries 15
     steps:
+      # Full history, not GitHub's default shallow clone: the web build resolves each work-log
+      # entry's commit from `git log` (apps/web/plugins/worklog.ts), and this is the job that
+      # builds it and asserts a commit link renders (apps/web/e2e/devlog.spec.ts).
       - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
 
       - uses: pnpm/action-setup@v6
 

@@ -1,6 +1,9 @@
 /** The largest request body, and socket message, the API accepts (PRD: 16 KB). */
 export const BODY_LIMIT_BYTES = 16 * 1024
 
+/** GET /api/rooms returns at most this many chatrooms: the newest ones when there are more. */
+export const MAX_ROOMS_LISTED = 1000
+
 /** The PRD's per-client write limits, used unless RATE_LIMIT_* raises them (see env.ts). */
 export const DEFAULT_ROOMS_PER_MINUTE = 10
 export const DEFAULT_MESSAGES_PER_MINUTE = 30

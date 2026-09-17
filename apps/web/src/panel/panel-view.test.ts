@@ -1,6 +1,6 @@
 import type { Room } from '@wolfchatter/shared'
 import { describe, expect, it } from 'vitest'
-import { panelView } from './panel-view.ts'
+import { panelView, ROOMS_STALE, ROOMS_UNAVAILABLE, roomsFailureText } from './panel-view.ts'
 
 const room: Room = {
   id: '7d9f1c2e-3b4a-4c5d-8e6f-0a1b2c3d4e5f',
@@ -72,5 +72,15 @@ describe('panelView', () => {
 
   it("FR-3: keeps the mockup's invitation when nothing is selected", () => {
     expect(panelView({ kind: 'none' }, undefined, [], true)).toEqual({ kind: 'empty' })
+  })
+})
+
+describe('roomsFailureText', () => {
+  it('says the chatrooms could not be loaded when the list has never succeeded', () => {
+    expect(roomsFailureText(false)).toBe(ROOMS_UNAVAILABLE)
+  })
+
+  it('says the list may be out of date when chatrooms are already on screen (M3 review)', () => {
+    expect(roomsFailureText(true)).toBe(ROOMS_STALE)
   })
 })

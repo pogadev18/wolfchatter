@@ -1,7 +1,7 @@
 import { randomUUID } from 'node:crypto'
 import { apiErrorResponseSchema, type Room, roomListSchema, roomSchema } from '@wolfchatter/shared'
 import { sql } from 'drizzle-orm'
-import { beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
+import { beforeAll, beforeEach, describe, expect, it, onTestFinished, vi } from 'vitest'
 import { buildTestApp } from '../../test/app.ts'
 import { createTestDatabase, type TestDatabase } from '../../test/database.ts'
 import { connectClient } from '../../test/sockets.ts'
@@ -110,5 +110,31 @@ describe('GET /api/rooms', () => {
       [ids[1], 2],
       [ids[2], 3],
     ])
+  })
+
+  it('keeps the newest chatrooms, oldest-first, once past the limit', async () => {
+    const limited = buildTestApp(database.db, { roomsListLimit: 2 })
+    onTestFinished(() => limited.app.close())
+    const ids = [randomUUID(), randomUUID(), randomUUID()]
+    for (const id of ids) await createRoom({ id, lat: 1, lng: 2 })
+
+    const response = await limited.app.inject({ method: 'GET', url: '/api/rooms' })
+
+    expect(response.statusCode).toBe(200)
+    const rooms = roomListSchema.parse(response.json())
+    expect(rooms.map((room) => room.number)).toEqual([2, 3])
+  })
+
+  it('returns everything, unchanged, when the count is under the limit', async () => {
+    const limited = buildTestApp(database.db, { roomsListLimit: 5 })
+    onTestFinished(() => limited.app.close())
+    const ids = [randomUUID(), randomUUID(), randomUUID()]
+    for (const id of ids) await createRoom({ id, lat: 1, lng: 2 })
+
+    const response = await limited.app.inject({ method: 'GET', url: '/api/rooms' })
+
+    expect(response.statusCode).toBe(200)
+    const rooms = roomListSchema.parse(response.json())
+    expect(rooms.map((room) => room.number)).toEqual([1, 2, 3])
   })
 })

@@ -29,7 +29,7 @@ const AGENT = new RegExp(`^(?:${WORKLOG_AGENT_ROLES.join('|')}) · \\S`)
 export const worklogFrontmatterSchema = z
   .strictObject({
     title: z.string().trim().min(3).max(120),
-    date: z.iso.datetime(),
+    date: z.iso.datetime({ precision: 0 }),
     agent: z
       .string()
       .trim()

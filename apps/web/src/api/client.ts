@@ -57,25 +57,71 @@ export interface ApiClient {
   createMessage(roomId: string, input: CreateMessageInput): Promise<Message>
 }
 
+export interface ApiClientOptions {
+  fetchFn?: typeof fetch
+  /** How long a single request waits for an answer before it gives up (see `DEFAULT_TIMEOUT_MS`
+   * for what the default has to cover, and why it alone is not the whole story). */
+  timeoutMs?: number
+}
+
+/**
+ * Every request's default deadline. One attempt cannot, by itself, span a full cold start: Render's
+ * free tier takes about a minute to wake (PRD §7's "Risks & assumptions"; `connection-status.ts`'s
+ * "Waking up the server…" text; a real cold start measured against the live API today took 33s).
+ * What actually has to cover that minute is this deadline *combined with* the unchanged retry
+ * policy in `query-client.ts` — traced from `@tanstack/query-core`'s retryer (`failureCount < N` is
+ * N retries, i.e. N+1 attempts, and `retry`/`retryDelay` are evaluated with `failureCount` *before*
+ * it increments) and confirmed by timing the real library with a stubbed, slow request: a mutation
+ * makes 3 attempts with 1s then 2s of backoff between them; a query makes 4 attempts with 1s, 2s,
+ * then 4s. At 30s per attempt that puts a mutation's total span at 3 × 30s + 3s = 93s and a query's
+ * at 4 × 30s + 7s = 127s — both comfortably past a one-minute wake, and each retry is a fresh
+ * request that succeeds as soon as the instance actually answers, not a full new cycle. What this
+ * number does not do on its own: a *single* attempt still only waits 30s, so a request sent right
+ * as the instance starts waking can still need a second attempt before one lands on an instance
+ * that has finished booting. That's fine here — mutations show "Sending…" for the whole retry
+ * sequence, not a premature failure, and only report "Not sent" once every attempt above is spent.
+ */
+export const DEFAULT_TIMEOUT_MS = 30_000
+
+/**
+ * An `AbortSignal` that fires on its own after `ms`, built on `setTimeout` rather than
+ * `AbortSignal.timeout` so a test can drive it with fake timers instead of waiting for real time
+ * to pass. `clear()` must run once the request it guards has settled, or the timer leaks.
+ */
+function timeoutSignal(ms: number): { signal: AbortSignal; clear: () => void } {
+  const controller = new AbortController()
+  const timer = setTimeout(() => controller.abort(new Error(`Timed out after ${ms}ms`)), ms)
+  return { signal: controller.signal, clear: () => clearTimeout(timer) }
+}
+
 /** Calls the API at `baseUrl` and checks every answer against the shared contract. */
-export function createApiClient(baseUrl: string, fetchFn: typeof fetch = fetch): ApiClient {
+export function createApiClient(baseUrl: string, options: ApiClientOptions = {}): ApiClient {
+  const { fetchFn = fetch, timeoutMs = DEFAULT_TIMEOUT_MS } = options
+
   async function request<Schema extends z.ZodType>(
     schema: Schema,
     path: string,
     body?: unknown,
   ): Promise<z.output<Schema>> {
-    const init =
-      body === undefined
-        ? undefined
-        : {
-            method: 'POST',
-            headers: { 'content-type': 'application/json' },
-            body: JSON.stringify(body),
-          }
-    const response = await fetchFn(`${baseUrl}${path}`, init)
-    const payload: unknown = await response.json().catch(() => undefined)
-    if (!response.ok) throw new ApiRequestError(response.status, errorFrom(response, payload))
-    return schema.parse(payload)
+    const { signal, clear } = timeoutSignal(timeoutMs)
+    try {
+      const init =
+        body === undefined
+          ? { signal }
+          : {
+              method: 'POST',
+              headers: { 'content-type': 'application/json' },
+              body: JSON.stringify(body),
+              signal,
+            }
+      const response = await fetchFn(`${baseUrl}${path}`, init)
+      const payload: unknown = await response.json().catch(() => undefined)
+      if (!response.ok) throw new ApiRequestError(response.status, errorFrom(response, payload))
+      return schema.parse(payload)
+    } finally {
+      // A request that settles on its own must not leave its timer running behind it.
+      clear()
+    }
   }
 
   return {

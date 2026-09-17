@@ -9,6 +9,12 @@ const ROME = { lat: 41.9028, lng: 12.4964 }
 /** Longer than the double-click window and the first retry's delay, so late requests are seen. */
 const SETTLE_MS = 1_500
 
+/**
+ * Long enough for Socket.IO's reconnection back-off (up to 5 seconds between tries) plus three
+ * query retries a second, two and four seconds apart.
+ */
+const STALE_BANNER_TIMEOUT_MS = 20_000
+
 test('FR-2: a single click adds a pin and opens its chatroom', async ({ page }) => {
   await page.goto('/')
   const click = await mapPoint(page, { x: -200, y: 100 })
@@ -102,7 +108,7 @@ test('FR-2: a click on another copy of the world creates the chatroom where it w
   expect(Math.abs(tip.y - center.y)).toBeLessThanOrEqual(2)
 })
 
-test('FR-2: a create the API rejects removes its pin, explains why and is never retried', async ({
+test('FR-2: a create the API rejects for good removes its pin, explains why and offers no retry', async ({
   page,
 }) => {
   const creates = recordRoomCreates(page)
@@ -125,14 +131,52 @@ test('FR-2: a create the API rejects removes its pin, explains why and is never 
   await page.mouse.click(click.x, click.y)
 
   const panel = page.getByRole('complementary', { name: 'Chat' })
-  await expect(panel.getByRole('alert')).toHaveText(
+  const notice = panel.getByRole('alert')
+  await expect(notice).toHaveText(
     "Couldn't create the chatroom. This chatroom id is already used by another chatroom.",
   )
+  // The same id and position would get the same 409, so a Retry button would be a broken promise.
+  await expect(notice.getByRole('button', { name: 'Retry' })).toHaveCount(0)
   await expect(panel).toContainText('Click on the map to start a chat')
   await expect(page).toHaveURL(/\/$/)
   await expect(page.locator('.room-pin')).toHaveCount(0)
   await page.waitForTimeout(SETTLE_MS)
   expect(creates).toHaveLength(1)
+})
+
+test('FR-2: Retry on a failed create tries again with the same id and position', async ({
+  page,
+}) => {
+  const creates = recordRoomCreates(page)
+  let fail = true
+  // A 429 can succeed on a later try, unlike a 409, and the query client does not retry it by
+  // itself, so the notice and its Retry button appear straight away.
+  await page.route('**/api/rooms', (route) =>
+    route.request().method() === 'POST' && fail
+      ? route.fulfill({
+          status: 429,
+          json: {
+            error: { code: 'RATE_LIMITED', message: 'Rate limit exceeded, retry in 1 minute' },
+          },
+        })
+      : route.continue(),
+  )
+  await page.goto('/')
+  const click = await mapPoint(page)
+  await page.mouse.click(click.x, click.y)
+  const panel = page.getByRole('complementary', { name: 'Chat' })
+  await expect(panel.getByRole('alert')).toHaveText(
+    "Couldn't create the chatroom. Rate limit exceeded, retry in 1 minute. Retry",
+  )
+  fail = false
+
+  await panel.getByRole('alert').getByRole('button', { name: 'Retry' }).click()
+
+  await expect(page.getByRole('heading', { name: 'Chatroom 1' })).toBeVisible()
+  await expect(page).toHaveURL(/\/\?room=[0-9a-f-]{36}$/)
+  await expect(panel.getByRole('alert')).toHaveCount(0)
+  expect(creates).toHaveLength(2)
+  expect(creates[1]).toEqual(creates[0])
 })
 
 test('FR-2: a create that fails on the way is retried with the same id and position', async ({
@@ -196,6 +240,39 @@ test('FR-4: the URL keeps the selection, in canonical form, across a reload', as
   await expect(pinNamed(page, 'Chatroom 1')).toHaveClass(/room-pin--selected/)
 })
 
+test('FR-4: selecting and deselecting a chatroom keeps every other query parameter', async ({
+  page,
+  database,
+}) => {
+  const room = await database.createRoom(CLUJ)
+  await page.goto('/?utm_source=test')
+
+  await pinNamed(page, 'Chatroom 1').click()
+
+  await expect(page.getByRole('heading', { name: 'Chatroom 1' })).toBeVisible()
+  await expect(page).toHaveURL(`/?utm_source=test&room=${room.id}`)
+
+  // A create failure deselects through the same updater as a manual deselect (`withRoomDeselected`).
+  await page.route('**/api/rooms', (route) =>
+    route.request().method() === 'POST'
+      ? route.fulfill({
+          status: 409,
+          json: {
+            error: {
+              code: 'CONFLICT',
+              message: 'This chatroom id is already used by another chatroom',
+            },
+          },
+        })
+      : route.continue(),
+  )
+  const click = await mapPoint(page, { x: -200, y: 100 })
+  await page.mouse.click(click.x, click.y)
+
+  await expect(page.getByRole('complementary', { name: 'Chat' }).getByRole('alert')).toBeVisible()
+  await expect(page).toHaveURL('/?utm_source=test')
+})
+
 test('FR-4: an unknown or malformed chatroom id shows "Chatroom not found"', async ({ page }) => {
   const panel = page.getByRole('complementary', { name: 'Chat' })
 
@@ -230,6 +307,47 @@ test('FR-4: says so when the chatroom list cannot be loaded, instead of loading 
   const panel = page.getByRole('complementary', { name: 'Chat' })
   await expect(panel.getByText('The chatrooms could not be loaded')).toBeVisible()
   await expect(panel).not.toContainText('Loading chatroom…')
+  // A sighted user sees the map's banner appear; a screen-reader user needs to be told too.
+  await expect(page.locator('main').getByRole('status')).toHaveText(
+    'The chatrooms could not be loaded',
+  )
+})
+
+test('FR-4: says the chatroom list may be out of date when a refresh fails, not that it is missing', async ({
+  page,
+  database,
+}) => {
+  await database.createRoom(CLUJ)
+  let attempts = 0
+  await page.route('**/api/rooms', (route) => {
+    if (route.request().method() !== 'GET') return route.continue()
+    attempts += 1
+    // The first GET is the page's own initial load, which must succeed so there is a list on
+    // screen already; every one after simulates a background refresh going wrong.
+    return attempts === 1
+      ? route.continue()
+      : route.fulfill({
+          status: 503,
+          json: { error: { code: 'INTERNAL', message: 'The chatrooms are not available' } },
+        })
+  })
+  await page.goto('/')
+  // Wait for the first, successful load to land before forcing another: realtime-sync.ts also
+  // refetches on the very first connect, and racing that against the initial mount fetch would
+  // make it unpredictable whether a second, separate request happens at all.
+  await expect(pinNamed(page, 'Chatroom 1')).toBeVisible()
+
+  // Forces the socket to reconnect, which refetches the chatroom list (realtime-sync.ts); this
+  // time the mock above fails it, simulating a background refresh going wrong after a real success.
+  await page.context().setOffline(true)
+  await page.context().setOffline(false)
+
+  await expect(page.locator('main').getByRole('status')).toHaveText(
+    'The chatroom list may be out of date',
+    { timeout: STALE_BANNER_TIMEOUT_MS },
+  )
+  // The pin the first, successful load fetched is still real: this failure did not remove it.
+  await expect(pinNamed(page, 'Chatroom 1')).toBeVisible()
 })
 
 test('FR-2, FR-4: going back to a chatroom clears the notice a failed create left behind', async ({
@@ -283,6 +401,43 @@ test('FR-2, FR-4: going back to a chatroom clears the notice a failed create lef
   await expect(panel.getByRole('alert')).toHaveText(
     'Your message was not sent. This message id is already used by another message.',
   )
+})
+
+test('FR-2: a create-failure notice does not linger once another chatroom has been opened', async ({
+  page,
+  database,
+}) => {
+  const rome = await database.createRoom(ROME)
+  const { promise: answer, resolve: letAnswer } = Promise.withResolvers<void>()
+  await page.route('**/api/rooms', async (route) => {
+    if (route.request().method() !== 'POST') return route.continue()
+    // Held until the other chatroom is opened, so the rejection arrives after the user moved on.
+    await answer
+    return route.fulfill({
+      status: 409,
+      json: {
+        error: {
+          code: 'CONFLICT',
+          message: 'This chatroom id is already used by another chatroom',
+        },
+      },
+    })
+  })
+  await page.goto('/')
+  const click = await mapPoint(page, { x: -200, y: 100 })
+  await page.mouse.click(click.x, click.y)
+  await expect(page.getByRole('heading', { name: 'Creating chatroom…' })).toBeVisible()
+  const panel = page.getByRole('complementary', { name: 'Chat' })
+
+  await pinNamed(page, 'Chatroom 1').click()
+  await expect(panel.getByRole('heading', { name: 'Chatroom 1' })).toBeVisible()
+  await expect(page).toHaveURL(`/?room=${rome.id}`)
+
+  letAnswer()
+  await page.waitForTimeout(SETTLE_MS)
+
+  await expect(panel.getByRole('alert')).toHaveCount(0)
+  await expect(panel.getByRole('heading', { name: 'Chatroom 1' })).toBeVisible()
 })
 
 test('FR-6: chatrooms survive a reload and a new session', async ({ page, browser }) => {

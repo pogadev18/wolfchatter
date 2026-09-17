@@ -29,12 +29,18 @@ describe('worklogFrontmatterSchema', () => {
     expect(worklogFrontmatterSchema.safeParse({ ...base, severity: 'low' }).success).toBe(false)
   })
 
+  it('accepts a date with whole seconds', () => {
+    const result = worklogFrontmatterSchema.safeParse({ ...base, date: '2026-09-16T04:17:00Z' })
+    expect(result.success).toBe(true)
+  })
+
   it.each([
     ['an unknown phase', { phase: 'coding' }],
     ['an unknown outcome', { outcome: 'meh' }],
     ['a malformed task id', { task: 'task 3' }],
     ['a malformed commit', { commits: ['not-a-sha'] }],
     ['a date without a timezone', { date: '2026-09-15T14:32:00' }],
+    ['a date with fractional seconds', { date: '2026-09-16T04:17:00.500Z' }],
     ['an unknown field', { mood: 'great' }],
     ['an agent without a role', { agent: 'claude-opus-5' }],
     ['an unknown agent role', { agent: 'robot · claude-opus-5' }],

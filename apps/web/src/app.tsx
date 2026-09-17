@@ -1,12 +1,14 @@
 import { type CreateRoomInput, type Room, roomTitle } from '@wolfchatter/shared'
 import type { LatLngLiteral } from 'leaflet'
 import { useState } from 'react'
-import { describeFailure } from './api/client.ts'
+import { describeFailure, isPermanentFailure } from './api/client.ts'
 import { wrapLongitude } from './map/longitude.ts'
 import { MapView } from './map/map-view.tsx'
 import type { RoomPin } from './map/room-pins.tsx'
-import { ChatPanel, ROOMS_UNAVAILABLE } from './panel/chat-panel.tsx'
-import { panelView } from './panel/panel-view.ts'
+import { ChatPanel } from './panel/chat-panel.tsx'
+import type { PanelNotice } from './panel/notice.ts'
+import { visibleNotice } from './panel/notice.ts'
+import { panelView, roomsFailureText } from './panel/panel-view.ts'
 import { useRealtime } from './realtime/use-realtime.ts'
 import { useRoomSelection } from './rooms/use-room-selection.ts'
 import { useCreateRoom, useRooms, useRoomsBeingCreated } from './rooms/use-rooms.ts'
@@ -23,11 +25,27 @@ export function App() {
   useRealtime(selectedRoomId)
   // The panel's one notice, wherever it came from. `setNotice` is stable, which is what lets
   // `RoomChat` clear it once per chatroom it opens instead of on every render.
-  const [notice, setNotice] = useState<string>()
+  const [notice, setNotice] = useState<PanelNotice>()
   const createRoom = useCreateRoom({
     onError: (error, input) => {
       deselectRoom(input.id)
-      setNotice(`Couldn't create the chatroom. ${describeFailure(error)}`)
+      setNotice({
+        text: `Couldn't create the chatroom. ${describeFailure(error)}`,
+        // Scopes the notice to the chatroom it is about (M3 review, requirement 5): shown while
+        // that failure is still relevant, hidden once the user has moved on to another one.
+        roomId: input.id,
+        // Retries with the same id and position; the API's create is idempotent on id, so this
+        // can never duplicate a chatroom the first, unseen attempt actually managed to store.
+        // Offered only when trying again can succeed: the same request after a 409 or a 400 gets
+        // the same answer, so a Retry button there would be a promise the app cannot keep.
+        retry: isPermanentFailure(error)
+          ? undefined
+          : () => {
+              setNotice(undefined)
+              createRoom.mutate(input)
+              selectRoom(input.id)
+            },
+      })
     },
   })
 
@@ -59,16 +77,19 @@ export function App() {
           right of the zoom buttons, and left of the floating panel on wide screens.
         */}
         {rooms.isError && (
-          <p className="pointer-events-none absolute top-4 right-4 left-14 z-[1100] text-center sm:right-[26rem]">
+          <p
+            role="status"
+            className="pointer-events-none absolute top-4 right-4 left-14 z-[1100] text-center sm:right-[26rem]"
+          >
             <span className="inline-block rounded bg-white/90 px-3 py-1 text-red-700 text-sm shadow">
-              {ROOMS_UNAVAILABLE}
+              {roomsFailureText(rooms.data !== undefined)}
             </span>
           </p>
         )}
       </main>
       <ChatPanel
         view={panelView(selection, rooms.data, creating, rooms.isError)}
-        notice={notice}
+        notice={visibleNotice(notice, selectedRoomId)}
         onNotice={setNotice}
       />
     </div>

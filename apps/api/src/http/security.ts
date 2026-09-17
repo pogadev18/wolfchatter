@@ -11,5 +11,12 @@ export interface SecurityOptions {
 export function registerSecurity(app: FastifyInstance, { corsOrigins }: SecurityOptions): void {
   app.register(helmet)
   app.register(cors, { origin: [...corsOrigins] })
-  app.register(rateLimit, { global: false })
+  app.register(rateLimit, {
+    global: false,
+    // Pinned, not left at the library default: a future @fastify/rate-limit upgrade that changed
+    // its default would silently widen or narrow every IPv6 client's bucket with no test failing.
+    // Same reasoning as writing sslmode=verify-full instead of trusting what `require` means
+    // today (see env.ts).
+    ipv6Subnet: 64,
+  })
 }

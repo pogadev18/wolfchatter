@@ -1,17 +1,29 @@
 import { existsSync } from 'node:fs'
+import { join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import pg from 'pg'
 import { parseEnv } from '../src/env.ts'
 
 /**
- * The Postgres server the tests use: DATABASE_URL from the environment (CI), else from
- * apps/api/.env, else from apps/api/.env.example, the same order `pnpm dev` uses.
+ * Loads `<dir>/.env.example` into `process.env`, for any variable not already set there.
+ *
+ * `.env` is deliberately never read: a developer's local override (a different database,
+ * different rate limits) must never leak into the test run, or a test could pass or fail for
+ * reasons that are not in the repository. `process.loadEnvFile` never replaces a variable already
+ * present in `process.env`, so a value the real environment already set (CI's DATABASE_URL)
+ * still wins over the file.
+ */
+export function loadEnvExample(dir: string): void {
+  const path = join(dir, '.env.example')
+  if (existsSync(path)) process.loadEnvFile(path)
+}
+
+/**
+ * The Postgres server the tests use: DATABASE_URL from the real environment (CI sets it), else
+ * from apps/api/.env.example. Never apps/api/.env — see loadEnvExample.
  */
 export function testServerUrl(): string {
-  for (const file of ['../.env', '../.env.example']) {
-    const path = fileURLToPath(new URL(file, import.meta.url))
-    if (existsSync(path)) process.loadEnvFile(path)
-  }
+  loadEnvExample(fileURLToPath(new URL('..', import.meta.url)))
   return parseEnv(process.env).DATABASE_URL
 }
 

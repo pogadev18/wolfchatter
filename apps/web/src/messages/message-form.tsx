@@ -1,5 +1,6 @@
 import { type CreateMessageInput, createMessageInputSchema } from '@wolfchatter/shared'
 import { type FormEvent, useEffect, useId, useRef, useState } from 'react'
+import type { PanelNotice } from '../panel/notice.ts'
 import { deviceStorage, loadUsername, saveUsername } from './username.ts'
 
 interface MessageFormProps {
@@ -7,7 +8,7 @@ interface MessageFormProps {
   disabled: boolean
   onSend(input: CreateMessageInput): void
   /** A client-side validation problem, reported upward so the panel shows at most one notice. */
-  onProblem(problem: string | undefined): void
+  onProblem(problem: PanelNotice | undefined): void
 }
 
 /** The mockup's inputs. Enter submits, and the shared contract checks the message before it is sent. */
@@ -28,7 +29,8 @@ export function MessageForm({ disabled, onSend, onProblem }: MessageFormProps) {
     if (disabled) return
     const parsed = createMessageInputSchema.safeParse({ id: crypto.randomUUID(), author, body })
     if (!parsed.success) {
-      onProblem(parsed.error.issues[0]?.message)
+      const message = parsed.error.issues[0]?.message
+      onProblem(message === undefined ? undefined : { text: message })
       return
     }
     setBody('')

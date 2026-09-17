@@ -17,6 +17,9 @@ export interface SocketServerOptions {
   corsOrigins: readonly string[]
 }
 
+/** Chatrooms one socket may join at once. The web app follows exactly one; ten is headroom. */
+const MAX_JOINED_ROOMS_PER_SOCKET = 10
+
 /**
  * Attaches Socket.IO to the API's HTTP server. WebSocket-only transport means a future
  * multi-instance setup needs no sticky sessions (PRD §4).
@@ -39,7 +42,20 @@ export function createSocketServer(
   io.on('connection', (socket) => {
     socket.on(
       'room:join',
-      subscription((channel) => socket.join(channel)),
+      subscription((channel) => {
+        // socket.rooms also holds the socket's own id, so count only chatroom channels.
+        const joined = [...socket.rooms].filter((room) => room.startsWith('room:')).length
+        if (joined >= MAX_JOINED_ROOMS_PER_SOCKET) {
+          return {
+            ok: false,
+            error: {
+              code: 'RATE_LIMITED',
+              message: `A connection may join at most ${MAX_JOINED_ROOMS_PER_SOCKET} chatrooms at once`,
+            },
+          }
+        }
+        return socket.join(channel)
+      }),
     )
     socket.on(
       'room:leave',
@@ -58,8 +74,14 @@ export function createSocketServer(
   return { io, publisher }
 }
 
-/** Validates a join or leave payload, applies it and acknowledges the result. */
-function subscription(apply: (channel: `room:${string}`) => void | Promise<void>) {
+/**
+ * Validates a join or leave payload, applies it and acknowledges the result. `apply` may return
+ * an ack of its own — such as a cap being reached — in which case that replaces the default
+ * `{ ok: true }`.
+ */
+function subscription(
+  apply: (channel: `room:${string}`) => SubscriptionAck | Promise<void> | void,
+) {
   return async (roomId: unknown, ack: unknown) => {
     const acknowledge = (result: SubscriptionAck) => {
       if (typeof ack === 'function') ack(result)
@@ -71,7 +93,7 @@ function subscription(apply: (channel: `room:${string}`) => void | Promise<void>
         error: { code: 'VALIDATION_FAILED', message: 'Room ids are UUIDs' },
       })
     }
-    await apply(roomChannel(parsed.data))
-    acknowledge({ ok: true })
+    const result = await apply(roomChannel(parsed.data))
+    acknowledge(result ?? { ok: true })
   }
 }

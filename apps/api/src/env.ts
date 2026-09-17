@@ -14,12 +14,40 @@ const list = (value: string) =>
 /** A whole number of requests a minute, at least one. */
 const perMinute = (fallback: number) => z.coerce.number().int().min(1).default(fallback)
 
+/** 127.0.0.0/8, `::1`, and the literal name `localhost` — reached without a network in between. */
+function isLoopbackHost(hostname: string): boolean {
+  if (hostname === 'localhost' || hostname === '[::1]') return true
+  const firstOctet = /^(\d{1,3})\.\d{1,3}\.\d{1,3}\.\d{1,3}$/.exec(hostname)?.[1]
+  return firstOctet !== undefined && Number(firstOctet) === 127
+}
+
+/**
+ * A deployed database must ask `pg` to verify its certificate chain. `pg` currently treats
+ * Neon's `sslmode=require` as `verify-full`, but after pg v9 the same string means libpq's
+ * unverified `require`, silently downgrading production TLS with no error and no failing test
+ * (see worklog/2026-09-16T0555-pg-treats-sslmode-require-as-verify-full-until-it-doesn-t.md).
+ * Spelling out `verify-full` survives that change. Loopback is exempt: nothing sits between the
+ * API and a local Postgres for a certificate to protect against.
+ */
+function hasVerifiedTlsOrIsLoopback(value: string): boolean {
+  // zod runs every check in the chain regardless of whether an earlier one already failed, so
+  // this must not throw on a value z.url() has already rejected (CORS_ORIGINS, below, guards
+  // its own `new URL()` the same way).
+  if (!URL.canParse(value)) return false
+  const url = new URL(value)
+  return isLoopbackHost(url.hostname) || url.searchParams.get('sslmode') === 'verify-full'
+}
+
 /** Environment variables the API reads. Everything except DATABASE_URL has a default. */
 export const envSchema = z.object({
-  DATABASE_URL: z.url({
-    protocol: /^postgres(ql)?$/,
-    error: 'DATABASE_URL must be a postgres:// URL',
-  }),
+  DATABASE_URL: z
+    .url({
+      protocol: /^postgres(ql)?$/,
+      error: 'DATABASE_URL must be a postgres:// URL',
+    })
+    .refine(hasVerifiedTlsOrIsLoopback, {
+      error: 'DATABASE_URL must set sslmode=verify-full for a non-loopback host',
+    }),
   HOST: z.string().min(1).default('0.0.0.0'),
   PORT: z.coerce.number().int().min(0).max(65_535).default(3000),
   LOG_LEVEL: z.enum(LOG_LEVELS).default('info'),
