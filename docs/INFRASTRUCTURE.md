@@ -93,7 +93,7 @@ gates a tile request — see the PRD's corrected risk note and the Gotchas in `C
 
 | Kind | Name | Holds | Why this kind |
 |---|---|---|---|
-| Secret | `DATABASE_URL` | Neon's **direct** connection string, `sslmode=verify-full` | Grants full read/write access to the database |
+| Secret | `DATABASE_URL` | Neon's **direct** connection string, `sslmode=verify-full`. Not the pooled one: the migration sends `lock_timeout` as a connection startup parameter, which Neon's pooler may drop or refuse | Grants full read/write access to the database |
 | Secret | `RENDER_DEPLOY_HOOK_URL` | Render's deploy-hook URL | Anyone holding it can trigger a deploy |
 | Secret | `NETLIFY_AUTH_TOKEN` | A Netlify auth token | Grants API access to the Netlify account; this workflow only uses it to publish |
 | Variable | `API_ORIGIN` | `https://wolfchatter-api.onrender.com` | An origin, not a credential — and printing it in a deploy log is worth more than hiding it |
@@ -223,6 +223,12 @@ Its steps, in order, and why each is where it is:
   - `pnpm dlx` and its `--allow-build` list on Linux, which have only run on macOS;
   - the CLI warm-up step and the build-before-migrate order, and the
     `$GITHUB_WORKSPACE/apps/web/dist` spelling of `--dir` (below), all added after the rehearsal.
+
+  All of them ran on 2026-09-17, in the automatic deploy of the merge commit `c097753` (run
+  35187218562), and all passed in 1 m 25 s. Render's Events show exactly one deploy for that
+  commit, via the hook. The same morning, the cold start was watched on the live site: "Waking up
+  the server…" at 3.9 seconds, connected at 35.4 seconds. Still unexercised: the fork and
+  failed-CI guards, a `head_sha` that differs from the branch tip, and rollback.
 - **A `200` from the deploy hook proves nothing.** Render answers the hook before the build even
   starts. The health poll afterward is the only evidence, and it requires both `ok: true` and the
   matching commit — a well-formed `503` reporting the right commit still means the API can't
@@ -237,7 +243,7 @@ Its steps, in order, and why each is where it is:
   `Deploy path: <repository root>/dist`. The same command with an absolute `--dir "$PWD/dist"`,
   still run from `apps/web`, published in 13 seconds. The workflow spells that same directory
   `$GITHUB_WORKSPACE/apps/web/dist`, which does not depend on the working directory at all; that
-  spelling has not run yet, and first runs in the first automatic deploy. This was the one defect
+  spelling first ran in the first automatic deploy, and published. This was the one defect
   that survived an implementer, a task review and a scoped re-review, because every earlier check
   confirmed the pinned CLI with `--version` — a flag `--dir` never touches (`f43330a`;
   `worklog/2026-09-16T1518-a-command-verified-with-version-was-not-the-command-that-run.md`).
@@ -378,15 +384,15 @@ improvement on an untrusted proxy, where every visitor shared a handful of per-e
 
 | Piece | Limit | Consequence |
 |---|---|---|
-| Render (API) | Free web services spin down after 15 minutes with no inbound traffic; Render's own docs estimate about a minute to restart one | Measured against this API, twice: **33 seconds**. The web app shows "Waking up the server…" during this, and every request carries a 30-second deadline |
+| Render (API) | Free web services spin down after 15 minutes with no inbound traffic; Render's own docs estimate about a minute to restart one | Measured against this API three times: **33 seconds** twice, then **35 seconds** on the live site on 2026-09-17, where the first request hit its 30-second deadline and a retry loaded the chatrooms. The web app shows "Waking up the server…" during this, and every request carries a 30-second deadline |
 | Render (account) | 750 free instance hours a month, shared across every free service on the account | Once exhausted, free services are suspended until the next month |
-| Neon | Compute suspends after 5 minutes of inactivity on the free plan and can't be disabled there; the next query resumes it | Not measured separately: `/api/health` queries the database directly, so the measured 33-second Render cold start already includes any time Neon's compute needed to wake |
+| Neon | Compute suspends after 5 minutes of inactivity on the free plan and can't be disabled there; the next query resumes it | Not measured separately: `/api/health` queries the database directly, so the measured 33–35-second Render cold start already includes any time Neon's compute needed to wake |
 
 A single 30-second request deadline can't by itself span a slept instance's wake — the number that
 actually has to cover it is that deadline combined with the query client's existing retry policy.
 Traced from `@tanstack/query-core`'s retryer and confirmed by timing the real library
 (`apps/web/src/api/client.ts`): a mutation makes 3 attempts across 93 seconds, a query makes 4
-across 127 seconds, both comfortably past a 33-second wake. A mutation shows "Sending…" for the
+across 127 seconds, both comfortably past a 33–35-second wake. A mutation shows "Sending…" for the
 whole sequence, not a flicker of failures, because TanStack Query's own status doesn't change
 between internal retries.
 

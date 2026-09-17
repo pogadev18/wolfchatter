@@ -4,7 +4,7 @@ Real-time chat on a map: click anywhere to drop a pin and open a chatroom, click
 
 **Live:** [wolfchatter.netlify.app](https://wolfchatter.netlify.app) · [devlog](https://wolfchatter.netlify.app/devlog) · [API health](https://wolfchatter-api.onrender.com/api/health)
 
-> **Deployed and working end to end.** The web app runs on Netlify, the API on Render, and Postgres on Neon; GitHub Actions deploys every push to `main` automatically. The API is on Render's free tier and sleeps after 15 minutes idle — the first request after that took 33 seconds in testing, and the app shows "Waking up the server…" while it wakes. See [Deployment](#deployment) below and [`docs/INFRASTRUCTURE.md`](docs/INFRASTRUCTURE.md) for how.
+> **Deployed and working end to end.** The web app runs on Netlify, the API on Render, and Postgres on Neon; GitHub Actions deploys every push to `main` automatically. The API is on Render's free tier and sleeps after 15 minutes idle — the first request after that took 33–35 seconds in testing, and the app shows "Waking up the server…" while it wakes. See [Deployment](#deployment) below and [`docs/INFRASTRUCTURE.md`](docs/INFRASTRUCTURE.md) for how.
 
 ## Documents
 

@@ -87,7 +87,7 @@ Socket  client → room:join(id, ack), room:leave(id, ack), acknowledged with
 ## 7. Risks & assumptions
 
 - **Stadia tiles, measured:** any `Referer` is served and a request with none gets a 401 — the real risk is a `Referrer-Policy: no-referrer` somewhere in the stack, not an unregistered domain; OSM fallback.
-- **Render's free tier sleeps (33s cold start, measured):** health ping and "waking up" banner; paid instance in the infra plan.
+- **Render's free tier sleeps (33–35s cold start, measured):** health ping and "waking up" banner; paid instance in the infra plan.
 - **A tool doesn't support TypeScript 7 yet:** fall back to TypeScript 6.0 while scaffolding.
 - **Spam without accounts:** per-IP rate limits (with the API trusting Render's proxy for client IPs); moderation is out of scope.
 - **Assumptions:** demo-level traffic, one API instance, anonymous self-chosen names, timestamps in the viewer's locale.
